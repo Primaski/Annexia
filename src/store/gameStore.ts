@@ -1,0 +1,194 @@
+/**
+ * gameStore.ts — Global game state via Zustand.
+ *
+ * ─── WHAT IS ZUSTAND? ────────────────────────────────────────────────────────
+ *
+ * Zustand is a lightweight state management library. It replaces "prop drilling"
+ * (passing data down through many component layers) with a global store that
+ * any component can read from or write to directly.
+ *
+ * Basic usage:
+ *   const tiles = useGameStore(state => state.tiles);       // read
+ *   const setPhase = useGameStore(state => state.setPhase); // write
+ *
+ * Zustand only re-renders a component when the specific slice it subscribes to
+ * actually changes — so reading `tiles` won't cause a re-render when `phase` changes.
+ *
+ * ─── WHAT LIVES HERE ─────────────────────────────────────────────────────────
+ *
+ * Everything that is part of the active game session:
+ *   - Map tiles
+ *   - Players and their state
+ *   - Current turn and phase
+ *   - Active game config
+ *
+ * What does NOT live here:
+ *   - UI-only state (selected tile, open panels, hover state) → uiStore.ts
+ *   - Derived/computed values → calculate them in components or useGame.ts
+ *
+ * ─── RULE ─────────────────────────────────────────────────────────────────────
+ *
+ * Actions in this store should only update state. Game logic (loyalty formulas,
+ * breakaway rolls, policy effects) lives in the engine/ files and is called
+ * via useGame.ts hooks, which then call these actions.
+ */
+
+import { create } from 'zustand';
+import type { Tile, Player, TurnPhase, GameConfig, WinCondition } from '../types';
+
+// ─── Default Values ───────────────────────────────────────────────────────────
+
+const DEFAULT_CONFIG: GameConfig = {
+  winCondition: 'majority' as WinCondition,
+  turnLimit: null,
+  mapCols: 30,
+  mapRows: 30,
+  playerCount: 2 ,
+};
+
+// ─── Store Shape ──────────────────────────────────────────────────────────────
+
+interface GameState {
+  // ── Map ──────────────────────────────────────────────────────────────────
+  /**
+   * All tiles on the map, keyed by coordKey(tile.coord) → e.g. "3,-1".
+   * Using a Record lets you look up a tile in O(1): tiles["3,-1"].
+   * Populated by mapGen.ts during setup; mutated by mobilization actions.
+   */
+  tiles: Record<string, Tile>;
+
+  // ── Players ───────────────────────────────────────────────────────────────
+  /**
+   * All players (human + AI). Order matters: index 0 is typically the human.
+   * Use player.id as the foreign key when referencing from tiles.
+   */
+  players: Player[];
+
+  // ── Turn Tracking ─────────────────────────────────────────────────────────
+  currentTurn: number;       // Starts at 1
+  phase: TurnPhase;          // Current phase within the turn
+  /**
+   * ID of the player currently taking their mobilization turn.
+   * null during policy phase (all players act simultaneously).
+   */
+  activePlayerId: string | null;
+  /**
+   * IDs of players who have submitted their policy choices this turn.
+   * Once this equals players.length, the policy phase resolves.
+   */
+  submittedPlayerIds: string[];
+
+  // ── Config ────────────────────────────────────────────────────────────────
+  config: GameConfig;
+
+  // ── Win/Loss ──────────────────────────────────────────────────────────────
+  winnerId: string | null;  // Set when a win condition is met; triggers EndScreen
+
+  // ── Map Seed ──────────────────────────────────────────────────────────────
+  mapSeed: number | null;   // Seed used for map generation; null before first gen
+
+  // ─── Actions ──────────────────────────────────────────────────────────────
+  // Naming convention: verbs that describe what changes, not what triggers it.
+
+  /** Replace the entire tile map (called once by mapGen at game start). */
+  setTiles: (tiles: Record<string, Tile>) => void;
+
+  /** Update a single tile (e.g. after annexation, suppression, loyalty shift). */
+  updateTile: (key: string, patch: Partial<Tile>) => void;
+
+  /** Replace the player list (called once at game start). */
+  setPlayers: (players: Player[]) => void;
+
+  /** Update one player's data (e.g. after spending military strength). */
+  updatePlayer: (id: string, patch: Partial<Player>) => void;
+
+  /** Advance to a new phase. */
+  setPhase: (phase: TurnPhase) => void;
+
+  /** Set which player is currently acting during mobilization. */
+  setActivePlayer: (playerId: string | null) => void;
+
+  /** Mark a player as having submitted their policy choices. */
+  markPolicySubmitted: (playerId: string) => void;
+
+  /** Advance the turn counter and reset per-turn state. */
+  advanceTurn: () => void;
+
+  /** Record a winner and end the game. */
+  setWinner: (playerId: string) => void;
+
+  /** Store the seed used for the current map generation. */
+  setMapSeed: (seed: number) => void;
+
+  /** Update the game config (called during setup). */
+  setConfig: (config: Partial<GameConfig>) => void;
+
+  /**
+   * Reset everything back to defaults.
+   * Call this when returning to the setup screen for a new game.
+   */
+  resetGame: () => void;
+}
+
+// ─── Initial State ────────────────────────────────────────────────────────────
+
+const initialState = {
+  tiles: {} as Record<string, Tile>,
+  players: [] as Player[],
+  currentTurn: 1,
+  phase: 'policy' as TurnPhase,
+  activePlayerId: null,
+  submittedPlayerIds: [] as string[],
+  config: DEFAULT_CONFIG,
+  winnerId: null,
+  mapSeed: null,
+};
+
+// ─── Store ────────────────────────────────────────────────────────────────────
+
+export const useGameStore = create<GameState>((set) => ({
+  ...initialState,
+
+  setTiles: (tiles) => set({ tiles }),
+
+  updateTile: (key, patch) =>
+    set((state) => ({
+      tiles: {
+        ...state.tiles,
+        [key]: { ...state.tiles[key], ...patch } as Tile,
+      },
+    })),
+
+  setPlayers: (players) => set({ players }),
+
+  updatePlayer: (id, patch) =>
+    set((state) => ({
+      players: state.players.map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    })),
+
+  setPhase: (phase) => set({ phase }),
+
+  setActivePlayer: (activePlayerId) => set({ activePlayerId }),
+
+  markPolicySubmitted: (playerId) =>
+    set((state) => ({
+      submittedPlayerIds: [...state.submittedPlayerIds, playerId],
+    })),
+
+  advanceTurn: () =>
+    set((state) => ({
+      currentTurn: state.currentTurn + 1,
+      phase: 'policy',
+      activePlayerId: null,
+      submittedPlayerIds: [],
+    })),
+
+  setWinner: (winnerId) => set({ winnerId }),
+
+  setMapSeed: (mapSeed) => set({ mapSeed }),
+
+  setConfig: (config) =>
+    set((state) => ({ config: { ...state.config, ...config } })),
+
+  resetGame: () => set({ ...initialState, config: DEFAULT_CONFIG }),
+}));

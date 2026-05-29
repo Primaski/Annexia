@@ -1,0 +1,25 @@
+{
+  "compilerOptions": {
+    "target": "ES2020",
+    "useDefineForClassFields": true,
+    "lib": ["ES2020", "DOM", "DOM.Iterable"],
+    "module": "ESNext",
+    "skipLibCheck": true,
+
+    /* Bundler mode — lets Vite handle module resolution instead of tsc */
+    "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,   /* Allows: import data from './data.json' */
+    "isolatedModules": true,
+    "noEmit": true,              /* tsc only type-checks; Vite does the actual build */
+    "jsx": "react-jsx",          /* React 17+ automatic JSX transform — no need to import React */
+
+    /* Strictness — catches bugs before runtime */
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "noFallthroughCasesInSwitch": true
+  },
+  "include": ["src"],
+  "references": [{ "path": "./tsconfig.node.json" }]
+}

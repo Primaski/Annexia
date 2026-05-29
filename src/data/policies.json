@@ -1,0 +1,83 @@
+[
+  {
+    "id": "pol_coal_subsidies",
+    "title": "Subsidize Coal Industry",
+    "description": "Redirect government funds to domestic coal producers, boosting energy output and industrial jobs — but at an environmental cost.",
+    "tags": ["economic", "energy", "environment"],
+    "weight": 1.0,
+    "choices": [
+      {
+        "label": "Approve",
+        "alignmentShift": { "ecology": -0.12, "militarism": 0.04, "liberty": -0.03 },
+        "loyaltyEffect": {
+          "filter": { "trait": "ecology", "threshold": 0.65, "above": true },
+          "modifier": -14
+        },
+        "flavour": "The furnaces burn bright tonight."
+      },
+      {
+        "label": "Reject",
+        "alignmentShift": { "ecology": 0.07 },
+        "loyaltyEffect": {
+          "filter": { "trait": "ecology", "threshold": 0.65, "above": true },
+          "modifier": 8
+        },
+        "flavour": "The energy lobby files a formal objection."
+      }
+    ]
+  },
+  {
+    "id": "pol_military_expansion",
+    "title": "Expand Standing Army",
+    "description": "Authorize a major increase in military personnel and equipment. Costs are significant; so is the deterrent effect.",
+    "tags": ["military", "economic"],
+    "weight": 0.9,
+    "choices": [
+      {
+        "label": "Authorize",
+        "alignmentShift": { "militarism": 0.1, "liberty": -0.05, "progress": -0.04 },
+        "loyaltyEffect": {
+          "filter": { "trait": "militarism", "threshold": 0.5, "above": false },
+          "modifier": -10
+        },
+        "flavour": "Conscription notices go out at dawn."
+      },
+      {
+        "label": "Decline",
+        "alignmentShift": { "militarism": -0.06, "liberty": 0.04 },
+        "loyaltyEffect": {
+          "filter": { "trait": "militarism", "threshold": 0.7, "above": true },
+          "modifier": -8
+        },
+        "flavour": "The generals are displeased but not surprised."
+      }
+    ]
+  },
+  {
+    "id": "pol_civil_liberties_act",
+    "title": "Civil Liberties Reform",
+    "description": "Expand rights of assembly, speech, and religious practice. Popular with diverse populations; seen as weakness by traditionalists.",
+    "tags": ["social", "governance"],
+    "weight": 0.85,
+    "choices": [
+      {
+        "label": "Pass",
+        "alignmentShift": { "liberty": 0.1, "progress": 0.07, "religion": 0.03 },
+        "loyaltyEffect": {
+          "filter": { "trait": "liberty", "threshold": 0.6, "above": true },
+          "modifier": 12
+        },
+        "flavour": "Crowds gather in the squares. Some are celebrating."
+      },
+      {
+        "label": "Table it",
+        "alignmentShift": { "progress": -0.05, "liberty": -0.04 },
+        "loyaltyEffect": {
+          "filter": { "trait": "liberty", "threshold": 0.6, "above": true },
+          "modifier": -6
+        },
+        "flavour": "Another cycle without reform. The opposition takes note."
+      }
+    ]
+  }
+]

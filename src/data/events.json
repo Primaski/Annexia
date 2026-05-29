@@ -1,0 +1,41 @@
+[
+  {
+    "id": "evt_separatist_movement",
+    "title": "Separatist Movement",
+    "description": "A cluster of your tiles is organizing against your rule. Loyalty is slipping.",
+    "trigger": "random",
+    "weight": 0.8,
+    "effect": {
+      "type": "loyalty_penalty",
+      "scope": "random_cluster",
+      "amount": -15,
+      "duration": 2
+    }
+  },
+  {
+    "id": "evt_cultural_wave",
+    "title": "Cultural Renaissance",
+    "description": "A surge of cultural pride spreads through the region. Players whose alignment matches the dominant local traits benefit.",
+    "trigger": "random",
+    "weight": 0.6,
+    "effect": {
+      "type": "loyalty_bonus",
+      "scope": "all_tiles",
+      "amount": 10,
+      "duration": 1
+    }
+  },
+  {
+    "id": "evt_economic_crisis",
+    "title": "Economic Crisis",
+    "description": "A financial shock cuts military resupply for this turn. All players are affected.",
+    "trigger": "random",
+    "weight": 0.5,
+    "effect": {
+      "type": "military_penalty",
+      "scope": "global",
+      "amount": -20,
+      "duration": 1
+    }
+  }
+]

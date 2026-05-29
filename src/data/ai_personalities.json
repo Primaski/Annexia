@@ -1,0 +1,74 @@
+[
+  {
+    "id": "ai_expansionist",
+    "name": "Expansionist",
+    "traitVector": {
+      "ecology": 0.2,
+      "militarism": 0.85,
+      "religion": 0.3,
+      "liberty": 0.4,
+      "progress": 0.5
+    },
+    "aggression": 0.8,
+    "expansionism": 0.9,
+    "decisionNoise": {
+      "easy": 0.5,
+      "medium": 0.25,
+      "hard": 0.08
+    }
+  },
+  {
+    "id": "ai_isolationist",
+    "name": "Isolationist",
+    "traitVector": {
+      "ecology": 0.6,
+      "militarism": 0.4,
+      "religion": 0.5,
+      "liberty": 0.5,
+      "progress": 0.2
+    },
+    "aggression": 0.15,
+    "expansionism": 0.2,
+    "decisionNoise": {
+      "easy": 0.5,
+      "medium": 0.25,
+      "hard": 0.08
+    }
+  },
+  {
+    "id": "ai_militarist",
+    "name": "Militarist",
+    "traitVector": {
+      "ecology": 0.1,
+      "militarism": 0.95,
+      "religion": 0.4,
+      "liberty": 0.2,
+      "progress": 0.4
+    },
+    "aggression": 0.95,
+    "expansionism": 0.7,
+    "decisionNoise": {
+      "easy": 0.5,
+      "medium": 0.25,
+      "hard": 0.08
+    }
+  },
+  {
+    "id": "ai_theocrat",
+    "name": "Theocrat",
+    "traitVector": {
+      "ecology": 0.3,
+      "militarism": 0.5,
+      "religion": 0.95,
+      "liberty": 0.1,
+      "progress": 0.1
+    },
+    "aggression": 0.4,
+    "expansionism": 0.5,
+    "decisionNoise": {
+      "easy": 0.5,
+      "medium": 0.25,
+      "hard": 0.08
+    }
+  }
+]
