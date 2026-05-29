@@ -5,7 +5,7 @@ import { spawnPlayers } from '../engine/spawnPlayers';
 import { SPAWN_LOYALTY, calculateLoyaltyTarget, stepLoyalty, isBreakawayCandidate } from '../engine/loyalty';
 import { coordKey, hexNeighbors } from '../engine/hex';
 import { DEFAULT_CONFIG } from '../config';
-import type { Tile, OwnedTile, BarbarianTile, Player } from '../types';
+import type { Tile, OwnedTile, BarbarianTile, Player, GovernmentType } from '../types';
 
 /**
  * Call once in the game screen to run the full generation pipeline:
@@ -36,7 +36,9 @@ export function useMapGen(): void {
         progress: 0.5,
       },
       confidence: 0.5,
-      advisorIds: [],
+      governmentType: 'none' as GovernmentType,
+      advisorId: null,
+      tribuneIds: [],
       personalityId: null,
     }));
 
@@ -74,7 +76,22 @@ export function useMapGen(): void {
     setTiles(tileRecord);
     setPlayers(players);
     setMapSeed(seed);
+    useGameStore.getState().setPendingRoundtable('game_start');
   }, []);
+}
+
+/**
+ * Stub for AI turn processing. AI players currently do nothing.
+ * Called during policy and mobilization phases for all non-human players.
+ * Replace with real AI logic in a later phase.
+ */
+export function processAITurns(): void {
+  const { players, markPolicySubmitted } = useGameStore.getState();
+  for (const player of players) {
+    if (!player.isHuman) {
+      markPolicySubmitted(player.id);
+    }
+  }
 }
 
 export function resolveTurn(): void {

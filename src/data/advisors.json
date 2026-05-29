@@ -1,82 +1,14 @@
 [
   {
-    "id": "adv_environmentalist",
-    "name": "Dr. Mara Voss",
-    "archetype": "environmentalist",
-    "traitWeights": {
-      "ecology": 0.9,
-      "militarism": 0.1,
-      "religion": 0.2,
-      "liberty": 0.5,
-      "progress": 0.6
-    },
-    "policyBias": {
-      "pol_coal_subsidies": -0.85,
-      "pol_green_energy_act": 0.9,
-      "pol_military_expansion": -0.5,
-      "pol_industrial_deregulation": -0.7
-    },
-    "flavourText": "Progress that poisons the soil is no progress at all.",
+    "id": "adv_steward_default",
+    "name": "The Steward",
+    "flavourText": "My only interest is the truth of what your people need.",
     "imagePath": null
   },
   {
-    "id": "adv_military_hawk",
-    "name": "General Rask",
-    "archetype": "military_hawk",
-    "traitWeights": {
-      "ecology": 0.1,
-      "militarism": 0.95,
-      "religion": 0.3,
-      "liberty": 0.2,
-      "progress": 0.4
-    },
-    "policyBias": {
-      "pol_military_expansion": 0.95,
-      "pol_demilitarization": -0.9,
-      "pol_coal_subsidies": 0.5,
-      "pol_civil_liberties_act": -0.6
-    },
-    "flavourText": "A border that can't be defended isn't a border — it's an invitation.",
-    "imagePath": null
-  },
-  {
-    "id": "adv_technocrat",
-    "name": "Director Chen",
-    "archetype": "technocrat",
-    "traitWeights": {
-      "ecology": 0.5,
-      "militarism": 0.4,
-      "religion": 0.1,
-      "liberty": 0.7,
-      "progress": 0.8
-    },
-    "policyBias": {
-      "pol_green_energy_act": 0.6,
-      "pol_industrial_deregulation": 0.5,
-      "pol_religious_subsidy": -0.7,
-      "pol_military_expansion": 0.3
-    },
-    "flavourText": "Every problem has an optimal solution. Finding it is just a matter of data.",
-    "imagePath": null
-  },
-  {
-    "id": "adv_populist",
-    "name": "Sister Calinda",
-    "archetype": "populist",
-    "traitWeights": {
-      "ecology": 0.5,
-      "militarism": 0.3,
-      "religion": 0.6,
-      "liberty": 0.6,
-      "progress": 0.3
-    },
-    "policyBias": {
-      "pol_civil_liberties_act": 0.8,
-      "pol_military_expansion": -0.4,
-      "pol_religious_subsidy": 0.75,
-      "pol_industrial_deregulation": -0.6
-    },
-    "flavourText": "The people don't need to be managed. They need to be heard.",
+    "id": "adv_steward_alt",
+    "name": "The Consul",
+    "flavourText": "I have no agenda here. Only observations.",
     "imagePath": null
   }
 ]

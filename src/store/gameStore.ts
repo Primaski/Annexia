@@ -34,7 +34,7 @@
  */
 
 import { create } from 'zustand';
-import type { Tile, Player, TurnPhase, GameConfig, WinCondition } from '../types';
+import type { Tile, Player, TurnPhase, GameConfig, WinCondition, Policy, RoundtableReason } from '../types';
 
 // ─── Default Values ───────────────────────────────────────────────────────────
 
@@ -78,6 +78,16 @@ interface GameState {
    */
   submittedPlayerIds: string[];
 
+  // ── Roundtable ────────────────────────────────────────────────────────────
+  /** Whether a roundtable phase should be inserted at the start of the next turn. */
+  pendingRoundtable: boolean;
+  /** What triggered the pending roundtable. Null when pendingRoundtable is false. */
+  roundtableReason: RoundtableReason | null;
+
+  // ── Mobilization ──────────────────────────────────────────────────────────
+  /** Actions remaining for the current player during mobilization. */
+  actionsRemaining: number;
+
   // ── Config ────────────────────────────────────────────────────────────────
   config: GameConfig;
 
@@ -86,6 +96,10 @@ interface GameState {
 
   // ── Map Seed ──────────────────────────────────────────────────────────────
   mapSeed: number | null;   // Seed used for map generation; null before first gen
+
+  // ── Policy Phase ──────────────────────────────────────────────────────────
+  /** Cards dealt to the human player for the current policy phase. Cleared on resolution. */
+  activePolicyCards: Policy[];
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   // Naming convention: verbs that describe what changes, not what triggers it.
@@ -114,11 +128,25 @@ interface GameState {
   /** Advance the turn counter and reset per-turn state. */
   advanceTurn: () => void;
 
+  /**
+   * Schedule a roundtable for the start of the next turn.
+   * Pass null to clear a pending roundtable without triggering one.
+   */
+  setPendingRoundtable: (reason: RoundtableReason | null) => void;
+
+  /** Decrement actionsRemaining by 1. Floor at 0. */
+  spendAction: () => void;
+
+  /** Set actionsRemaining directly (called at the start of mobilization). */
+  setActionsRemaining: (n: number) => void;
+
   /** Record a winner and end the game. */
   setWinner: (playerId: string) => void;
 
   /** Store the seed used for the current map generation. */
   setMapSeed: (seed: number) => void;
+
+  setActivePolicyCards: (cards: Policy[]) => void;
 
   /** Update the game config (called during setup). */
   setConfig: (config: Partial<GameConfig>) => void;
@@ -139,9 +167,13 @@ const initialState = {
   phase: 'policy' as TurnPhase,
   activePlayerId: null,
   submittedPlayerIds: [] as string[],
+  pendingRoundtable: false,
+  roundtableReason: null,
+  actionsRemaining: 0,
   config: DEFAULT_CONFIG,
   winnerId: null,
   mapSeed: null,
+  activePolicyCards: [] as Policy[],
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -178,10 +210,21 @@ export const useGameStore = create<GameState>((set) => ({
   advanceTurn: () =>
     set((state) => ({
       currentTurn: state.currentTurn + 1,
-      phase: 'policy',
+      phase: state.pendingRoundtable ? 'roundtable' : 'policy',
       activePlayerId: null,
       submittedPlayerIds: [],
+      actionsRemaining: 0,
     })),
+
+  setPendingRoundtable: (reason) =>
+    set({ pendingRoundtable: reason !== null, roundtableReason: reason }),
+
+  spendAction: () =>
+    set((state) => ({ actionsRemaining: Math.max(0, state.actionsRemaining - 1) })),
+
+  setActionsRemaining: (actionsRemaining) => set({ actionsRemaining }),
+
+  setActivePolicyCards: (activePolicyCards) => set({ activePolicyCards }),
 
   setWinner: (winnerId) => set({ winnerId }),
 

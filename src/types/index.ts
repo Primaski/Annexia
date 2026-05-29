@@ -35,25 +35,34 @@ export interface TraitVector {
   progress: number; // Openness to change vs. tradition
 }
 
+export type GovernmentType = 'none' | 'democracy' | 'hybrid' | 'autocracy';
+
 // ─── JSON Data Types (advisors.json) ─────────────────────────────────────────
 
 /**
- * One advisor entry from advisors.json.
- * Advisors are selected by the player at game start and influence policy
+ * One tribune entry from advisors.json.
+ * Tribunes are selected by the player at game start and influence policy
  * recommendations, alignment drift, and available mobilization actions.
  */
-export interface Advisor {
+export interface Tribune {
   id: string;           // e.g. "adv_environmentalist" — must be unique
   name: string;         // Display name: "Dr. Mara Voss"
   archetype: string;    // e.g. "environmentalist" — used for grouping / flavor
-  traitWeights: TraitVector; // What this advisor values; drives their policy biases
+  traitWeights: TraitVector; // What this tribune values; drives their policy biases
   /**
    * Per-policy preference scores from -1.0 (strongly oppose) to 1.0 (strongly endorse).
    * Keys are policy IDs from policies.json. Unlisted policies = neutral (0).
    */
   policyBias: Record<string, number>;
-  flavourText: string;       // Short quote displayed in the advisor panel
+  flavourText: string;       // Short quote displayed in the tribune panel
   imagePath: string | null;  // Path to portrait image; null until Phase 4
+}
+
+export interface Advisor {
+  id: string;
+  name: string;
+  flavourText: string;
+  imagePath: string | null;
 }
 
 // ─── JSON Data Types (policies.json) ─────────────────────────────────────────
@@ -224,7 +233,9 @@ export interface Player {
   isHuman: boolean;
   alignmentVector: TraitVector;  // Shifts with every policy decision
   confidence: number;            // [0, 1]. Affects propaganda and smear actions.
-  advisorIds: string[];          // IDs of selected advisors (2–3 entries)
+  governmentType: GovernmentType;
+  tribuneIds: string[];          // IDs of selected tribunes (2–3 entries)
+  advisorId: string | null;
   personalityId: string | null;  // AI only; references ai_personalities.json
 }
 
@@ -234,7 +245,16 @@ export interface Player {
  * The two main phases of each turn.
  * 'resolution' is a brief interstitial while breakaways / events are applied.
  */
-export type TurnPhase = 'policy' | 'mobilization' | 'resolution';
+export type TurnPhase = 'roundtable' | 'policy' | 'calibration' | 'mobilization';
+
+export type RoundtableReason =
+  | 'game_start'
+  | 'invasion'
+  | 'breakaway'
+  | 'public_disapproval'
+  | 'government_change'
+  | 'war_declared'
+  | 'peace_declared';
 
 /** The high-level screen the player is looking at. */
 export type ScreenState = 'setup' | 'game' | 'end';
