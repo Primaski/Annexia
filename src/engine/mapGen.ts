@@ -14,7 +14,8 @@
 import { createNoise2D } from 'simplex-noise';
 import { coordKey, generateGridCoords, hexNeighbors, isInGrid } from './hex';
 import type { AxialCoord, PixelCoord } from './hex';
-import type { TraitVector, Tile } from '../types';
+import type { TraitVector, Tile, Nation } from '../types';
+import { generateName } from './names';
 import type { TuningConfig } from '../config';
 
 // ─── PRNG ─────────────────────────────────────────────────────────────────────
@@ -391,10 +392,15 @@ function centerLandmass(
 
 // ─── Public API ───────────────────────────────────────────────────────────────
 
+export interface MapGenResult {
+  tiles: Tile[];
+  nations: Nation[];
+}
+
 /**
- * Generate a complete map and return it as a flat Tile array.
+ * Generate a complete map and return tiles plus the nation list.
  *
- * The array order matches generateGridCoords(cols, rows) — row-major, left to right.
+ * The tile array order matches generateGridCoords(cols, rows) — row-major, left to right.
  * Conversion to Record<string, Tile> (for the store) happens at the call site.
  *
  * Produces only WaterTile, UnclaimedTile, and BarbarianTile.
@@ -405,7 +411,7 @@ export function generateMap(
   rows: number,
   config: TuningConfig['map'],
   seed: number = Date.now()
-): Tile[] {
+): MapGenResult {
   const coords = generateGridCoords(cols, rows);
 
   // Steps 1–2: Voronoi point layout and land/water classification
@@ -424,6 +430,9 @@ export function generateMap(
   const cultureNoise = TRAIT_KEYS.map((_, i) =>
     createNoise2D(mulberry32(((seed ^ ((i + 1) * 0x4b2a53f7)) >>> 0)))
   );
+
+  // Separate PRNG for Steps 3a–3d so it doesn't interfere with Steps 1–2
+  const rand = mulberry32(((seed ^ 0xf0e1d2c3) >>> 0));
 
   // Step 3a: Build initial tiles and collect land coordinates
   const tiles: Tile[] = [];
@@ -453,7 +462,7 @@ export function generateMap(
     };
 
     landCoords.push(coord);
-    tiles.push({ coord, state: 'unclaimed', cultureVector });
+    tiles.push({ coord, state: 'unclaimed', cultureVector, name: generateName(rand), nationId: null });
   }
 
   // Step 3b: Grow barbarian clusters from random land seeds
@@ -462,16 +471,56 @@ export function generateMap(
     2,
     Math.floor(landCoords.length * config.barbarianFraction / BARBARIAN_CLUSTER_SIZE)
   );
-  // Separate PRNG for Step 3 so it doesn't interfere with Steps 1–2
-  const rand = mulberry32(((seed ^ 0xf0e1d2c3) >>> 0));
   const barbarianKeys = growBarbarianClusters(
     landCoords, barbarianCount, clusterSeedCount, cols, rows, rand
   );
 
   // Step 3c: Stamp barbarian state and assign defense values (20–60)
-  return tiles.map((tile): Tile => {
+  const stampedTiles = tiles.map((tile): Tile => {
     if (tile.state !== 'unclaimed' || !barbarianKeys.has(coordKey(tile.coord))) return tile;
     const defense = Math.floor(rand() * 41) + 20;
     return { ...tile, state: 'barbarian' as const, defense };
   });
+
+  // Step 3d: Flood-fill barbarian tiles to assign contiguous nation IDs
+  const tileByKey = new Map<string, Tile>(stampedTiles.map((t) => [coordKey(t.coord), t]));
+  const visitedKeys = new Set<string>();
+  const nations: Nation[] = [];
+
+  for (const tile of stampedTiles) {
+    if (tile.state !== 'barbarian') continue;
+    const startKey = coordKey(tile.coord);
+    if (visitedKeys.has(startKey)) continue;
+
+    const clusterKeys: string[] = [];
+    const queue: AxialCoord[] = [tile.coord];
+    visitedKeys.add(startKey);
+
+    let head = 0;
+    while (head < queue.length) {
+      const cur = queue[head++];
+      clusterKeys.push(coordKey(cur));
+      for (const neighbor of hexNeighbors(cur)) {
+        if (!isInGrid(neighbor, cols, rows)) continue;
+        const nKey = coordKey(neighbor);
+        if (!visitedKeys.has(nKey) && tileByKey.get(nKey)?.state === 'barbarian') {
+          visitedKeys.add(nKey);
+          queue.push(neighbor);
+        }
+      }
+    }
+
+    const nationId = `nation_${nations.length}`;
+    nations.push({ id: nationId, name: generateName(rand), isBarbarian: true, imagePath: null });
+
+    for (const cKey of clusterKeys) {
+      const t = tileByKey.get(cKey)!;
+      tileByKey.set(cKey, { ...t, nationId } as Tile);
+    }
+  }
+
+  return {
+    tiles: stampedTiles.map((t) => tileByKey.get(coordKey(t.coord))!),
+    nations,
+  };
 }

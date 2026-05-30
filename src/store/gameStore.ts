@@ -34,7 +34,7 @@
  */
 
 import { create } from 'zustand';
-import type { Tile, Player, TurnPhase, GameConfig, WinCondition, Policy, RoundtableReason } from '../types';
+import type { Tile, Player, TurnPhase, GameConfig, WinCondition, Policy, RoundtableReason, Nation, Tribune, Notification } from '../types';
 
 // ─── Default Values ───────────────────────────────────────────────────────────
 
@@ -56,6 +56,10 @@ interface GameState {
    * Populated by mapGen.ts during setup; mutated by mobilization actions.
    */
   tiles: Record<string, Tile>;
+  /** All nations on the map, keyed by nation id. */
+  nations: Record<string, Nation>;
+  /** Tribune roster loaded from tribunes.json at game start. */
+  tribunes: Tribune[];
 
   // ── Players ───────────────────────────────────────────────────────────────
   /**
@@ -97,6 +101,9 @@ interface GameState {
   // ── Map Seed ──────────────────────────────────────────────────────────────
   mapSeed: number | null;   // Seed used for map generation; null before first gen
 
+  // ── Notifications ─────────────────────────────────────────────────────────
+  notifications: Notification[];
+
   // ── Policy Phase ──────────────────────────────────────────────────────────
   /** Cards dealt to the human player for the current policy phase. Cleared on resolution. */
   activePolicyCards: Policy[];
@@ -109,6 +116,15 @@ interface GameState {
 
   /** Update a single tile (e.g. after annexation, suppression, loyalty shift). */
   updateTile: (key: string, patch: Partial<Tile>) => void;
+
+  /** Replace the full nations record (called once at game start). */
+  setNations: (nations: Record<string, Nation>) => void;
+
+  /** Add or replace a single nation (used when minting breakaway nations mid-game). */
+  addNation: (nation: Nation) => void;
+
+  /** Load the tribune roster (called once at game start). */
+  setTribunes: (tribunes: Tribune[]) => void;
 
   /** Replace the player list (called once at game start). */
   setPlayers: (players: Player[]) => void;
@@ -148,6 +164,9 @@ interface GameState {
 
   setActivePolicyCards: (cards: Policy[]) => void;
 
+  addNotification: (n: Notification) => void;
+  dismissNotification: (id: string) => void;
+
   /** Update the game config (called during setup). */
   setConfig: (config: Partial<GameConfig>) => void;
 
@@ -162,6 +181,8 @@ interface GameState {
 
 const initialState = {
   tiles: {} as Record<string, Tile>,
+  nations: {} as Record<string, Nation>,
+  tribunes: [] as Tribune[],
   players: [] as Player[],
   currentTurn: 1,
   phase: 'policy' as TurnPhase,
@@ -174,6 +195,7 @@ const initialState = {
   winnerId: null,
   mapSeed: null,
   activePolicyCards: [] as Policy[],
+  notifications: [] as Notification[],
 };
 
 // ─── Store ────────────────────────────────────────────────────────────────────
@@ -182,6 +204,13 @@ export const useGameStore = create<GameState>((set) => ({
   ...initialState,
 
   setTiles: (tiles) => set({ tiles }),
+
+  setNations: (nations) => set({ nations }),
+
+  setTribunes: (tribunes) => set({ tribunes }),
+
+  addNation: (nation) =>
+    set((state) => ({ nations: { ...state.nations, [nation.id]: nation } })),
 
   updateTile: (key, patch) =>
     set((state) => ({
@@ -225,6 +254,12 @@ export const useGameStore = create<GameState>((set) => ({
   setActionsRemaining: (actionsRemaining) => set({ actionsRemaining }),
 
   setActivePolicyCards: (activePolicyCards) => set({ activePolicyCards }),
+
+  addNotification: (n) =>
+    set((state) => ({ notifications: [...state.notifications, n] })),
+
+  dismissNotification: (id) =>
+    set((state) => ({ notifications: state.notifications.filter((n) => n.id !== id) })),
 
   setWinner: (winnerId) => set({ winnerId }),
 

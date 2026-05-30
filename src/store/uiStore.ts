@@ -55,6 +55,10 @@ interface UIState {
    */
   activePolicyCardIndex: number;
 
+  // ── Roundtable ────────────────────────────────────────────────────────────
+  roundtableOpen: boolean;
+  setRoundtableOpen: (open: boolean) => void;
+
   // ─── Actions ──────────────────────────────────────────────────────────────
 
   setScreen: (screen: ScreenState) => void;
@@ -78,6 +82,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   screen: 'setup',
+  roundtableOpen: true,
   selectedTileCoord: null,
   activeOverlay: null,
   advisorPanelOpen: false,
@@ -85,6 +90,8 @@ export const useUIStore = create<UIState>((set) => ({
   activePolicyCardIndex: 0,
 
   setScreen: (screen) => set({ screen }),
+
+  setRoundtableOpen: (roundtableOpen) => set({ roundtableOpen }),
 
   selectTile: (selectedTileCoord) => set({ selectedTileCoord }),
 

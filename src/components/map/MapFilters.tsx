@@ -45,7 +45,7 @@ export function MapFilters() {
   };
 
   return (
-    <div style={{ position: 'fixed', bottom: 16, left: 16, display: 'flex', gap: 6 }}>
+    <>
       <button style={btnStyle(activeOverlay === null)} onClick={() => setActiveOverlay(null)}>
         {mapSeed ?? '—'}
       </button>
@@ -63,11 +63,11 @@ export function MapFilters() {
         );
       })}
       <button
-        style={btnStyle(activeOverlay?.trait === 'loyalty', { marginLeft: 8 })}
+        style={btnStyle(activeOverlay?.trait === 'loyalty')}
         onClick={handleLoyalty}
       >
         loyalty ❤️
       </button>
-    </div>
+    </>
   );
 }

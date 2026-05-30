@@ -1,10 +1,10 @@
 [
   {
-    "id": "adv_environmentalist",
+    "id": "tr_environmentalist",
     "name": "Dr. Mara Voss",
     "archetype": "environmentalist",
     "traitWeights": {
-      "ecology": 0.9,
+      "ecology": 0.9, 
       "militarism": 0.1,
       "religion": 0.2,
       "liberty": 0.5,
@@ -17,15 +17,15 @@
       "pol_industrial_deregulation": -0.7
     },
     "flavourText": "Progress that poisons the soil is no progress at all.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=1"
   },
   {
-    "id": "adv_military_hawk",
+    "id": "tr_military_hawk",
     "name": "General Rask",
     "archetype": "military_hawk",
     "traitWeights": {
-      "ecology": 0.1,
       "militarism": 0.95,
+      "ecology": 0.1,
       "religion": 0.3,
       "liberty": 0.2,
       "progress": 0.4
@@ -37,18 +37,18 @@
       "pol_civil_liberties_act": -0.6
     },
     "flavourText": "A border that can't be defended isn't a border — it's an invitation.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=2"
   },
   {
-    "id": "adv_technocrat",
+    "id": "tr_technocrat",
     "name": "Director Chen",
     "archetype": "technocrat",
     "traitWeights": {
+      "progress": 0.8,
       "ecology": 0.5,
       "militarism": 0.4,
       "religion": 0.1,
-      "liberty": 0.7,
-      "progress": 0.8
+      "liberty": 0.7
     },
     "policyBias": {
       "pol_green_energy_act": 0.6,
@@ -57,16 +57,16 @@
       "pol_military_expansion": 0.3
     },
     "flavourText": "Every problem has an optimal solution. Finding it is just a matter of data.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=3"
   },
   {
-    "id": "adv_populist",
+    "id": "tr_populist",
     "name": "Sister Calinda",
     "archetype": "populist",
     "traitWeights": {
+      "religion": 0.8,
       "ecology": 0.5,
       "militarism": 0.3,
-      "religion": 0.6,
       "liberty": 0.6,
       "progress": 0.3
     },
@@ -77,6 +77,26 @@
       "pol_industrial_deregulation": -0.6
     },
     "flavourText": "The people don't need to be managed. They need to be heard.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=4"
+  },
+    {
+    "id": "tr_industrialist",
+    "name": "Montgomery Gould",
+    "archetype": "industrialist",
+    "traitWeights": {
+      "ecology": 0.1,
+      "militarism": 0.7,
+      "religion": 0.5,
+      "liberty": 0.4,
+      "progress": 0.6
+    },
+    "policyBias": {
+      "pol_industrial_deregulation": 0.9,
+      "pol_coal_subsidies": 0.8,
+      "pol_military_expansion": 0.4,
+      "pol_green_energy_act": -0.7
+    },
+    "flavourText": "Tears make excellent lubricant for the textile looms.",
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=5"
   }
 ]

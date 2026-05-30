@@ -161,6 +161,16 @@ export interface AIPersonality {
   aggression: number;       // 0–1: how likely to invade vs. consolidate
   expansionism: number;     // 0–1: how much it prioritizes growing territory
   decisionNoise: DecisionNoise;
+  imagePath: string | null;
+}
+
+// ─── Nations ─────────────────────────────────────────────────────────────────
+
+export interface Nation {
+  id: string;        // e.g. "nation_0", "nation_1"
+  name: string;      // generated name
+  isBarbarian: boolean;
+  imagePath: string | null;
 }
 
 // ─── Tile Types ───────────────────────────────────────────────────────────────
@@ -177,6 +187,8 @@ interface BaseTile {
 
 interface LandTile extends BaseTile {
   cultureVector: TraitVector; // This tile's cultural identity (generated, mostly immutable)
+  name: string;               // Generated place name (e.g. "Koltai")
+  nationId: string | null;    // References Nation.id; null for unclaimed tiles
 }
 
 /**
@@ -237,6 +249,15 @@ export interface Player {
   tribuneIds: string[];          // IDs of selected tribunes (2–3 entries)
   advisorId: string | null;
   personalityId: string | null;  // AI only; references ai_personalities.json
+  nationId: string | null;       // References Nation.id; null before roundtable
+  imagePath: string | null;
+}
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export interface Notification {
+  id: string;
+  text: string;
 }
 
 // ─── Turn / Phase State ───────────────────────────────────────────────────────

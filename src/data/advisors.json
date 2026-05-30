@@ -3,12 +3,12 @@
     "id": "adv_steward_default",
     "name": "The Steward",
     "flavourText": "My only interest is the truth of what your people need.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=av"
   },
   {
     "id": "adv_steward_alt",
     "name": "The Consul",
     "flavourText": "I have no agenda here. Only observations.",
-    "imagePath": null
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=a"
   }
 ]

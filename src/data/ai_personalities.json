@@ -15,7 +15,8 @@
       "easy": 0.5,
       "medium": 0.25,
       "hard": 0.08
-    }
+    },
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=1"
   },
   {
     "id": "ai_isolationist",
@@ -33,7 +34,8 @@
       "easy": 0.5,
       "medium": 0.25,
       "hard": 0.08
-    }
+    },
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=2"
   },
   {
     "id": "ai_militarist",
@@ -51,14 +53,15 @@
       "easy": 0.5,
       "medium": 0.25,
       "hard": 0.08
-    }
+    },
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=3"
   },
   {
     "id": "ai_theocrat",
     "name": "Theocrat",
     "traitVector": {
       "ecology": 0.3,
-      "militarism": 0.5,
+      "militarism": 0.6,
       "religion": 0.95,
       "liberty": 0.1,
       "progress": 0.1
@@ -69,6 +72,7 @@
       "easy": 0.5,
       "medium": 0.25,
       "hard": 0.08
-    }
+    },
+    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=4"
   }
 ]
