@@ -1,5 +1,4 @@
 import { useUIStore } from '../../store/uiStore';
-import { useGameStore } from '../../store/gameStore';
 import type { TraitVector } from '../../types';
 
 const TRAIT_META: { key: keyof TraitVector; pos: string; posEmoji: string; neg: string; negEmoji: string }[] = [
@@ -13,8 +12,6 @@ const TRAIT_META: { key: keyof TraitVector; pos: string; posEmoji: string; neg: 
 export function MapFilters() {
   const activeOverlay = useUIStore((state) => state.activeOverlay);
   const setActiveOverlay = useUIStore((state) => state.setActiveOverlay);
-  const mapSeed = useGameStore((state) => state.mapSeed);
-
   const btnStyle = (active: boolean, extraStyle?: React.CSSProperties): React.CSSProperties => ({
     padding: '4px 10px',
     fontFamily: 'monospace',
@@ -47,7 +44,7 @@ export function MapFilters() {
   return (
     <>
       <button style={btnStyle(activeOverlay === null)} onClick={() => setActiveOverlay(null)}>
-        {mapSeed ?? '—'}
+        Default
       </button>
       {TRAIT_META.map(({ key, pos, posEmoji, neg, negEmoji }) => {
         const isActive = activeOverlay?.trait === key;

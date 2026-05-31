@@ -25,6 +25,20 @@ export interface TuningConfig {
     breakawayThreshold: number;       // Internal units. Tile is a breakaway candidate when loyalty ≤ this value.
     momentumRate: number;             // Drift speed toward target. Percentage of gap closed per turn.
   };
+  policy: {
+    tribuneSentimentShift: number; // How much a tribune's sentiment shifts per policy interaction.
+    vetoCeilingDemocracy: number;  // Max veto probability in a democracy (applied × |bias|).
+    vetoCeilingHybrid: number;     // Max veto probability in a hybrid government.
+    vetoCeilingAutocracy: number;  // Max veto probability in an autocracy (typically 0).
+  };
+  mobilization: {
+    startingAP: number;      // Action points available at the start of each mobilization phase.
+    annexTroopCost: number;  // Troops consumed from sources to annex one unclaimed tile.
+    spawnTroops: number;     // Troops placed on a player's spawn tile at game start.
+    startingBudget: number;  // Budget given to each player at game start.
+    troopIncomeSuspendThreshold: number;   // avg loyalty below this disables troop_income effects
+    budgetIncomeSuspendThreshold: number;  // avg loyalty below this disables budget_income effects
+  };
 }
 
 export const DEFAULT_CONFIG: TuningConfig = {
@@ -37,7 +51,21 @@ export const DEFAULT_CONFIG: TuningConfig = {
   },
   loyalty: {
     neighborPressureStrength: 1.0,
-    breakawayThreshold: -1,
+    breakawayThreshold: 2000,
     momentumRate: 0.2,
+  },
+  policy: {
+    tribuneSentimentShift: 0.15,
+    vetoCeilingDemocracy: 0.50,
+    vetoCeilingHybrid: 0.25,
+    vetoCeilingAutocracy: 0.00,
+  },
+  mobilization: {
+    startingAP: 10,
+    annexTroopCost: 5,
+    spawnTroops: 8,
+    startingBudget: 90,
+    troopIncomeSuspendThreshold: -2500,
+    budgetIncomeSuspendThreshold: -4000,
   },
 };

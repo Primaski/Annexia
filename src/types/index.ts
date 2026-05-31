@@ -50,10 +50,11 @@ export interface Tribune {
   archetype: string;    // e.g. "environmentalist" — used for grouping / flavor
   traitWeights: TraitVector; // What this tribune values; drives their policy biases
   /**
-   * Per-policy preference scores from -1.0 (strongly oppose) to 1.0 (strongly endorse).
-   * Keys are policy IDs from policies.json. Unlisted policies = neutral (0).
+   * Per-policy stances. Keys are policy IDs from policies.json. Unlisted policies = neutral (bias 0).
+   * bias: -1.0 (strongly oppose) to 1.0 (strongly endorse).
+   * flavor: one sentence of in-character reaction to this policy.
    */
-  policyBias: Record<string, number>;
+  policyStances: Record<string, { bias: number; flavor: string }>;
   flavourText: string;       // Short quote displayed in the tribune panel
   imagePath: string | null;  // Path to portrait image; null until Phase 4
 }
@@ -68,39 +69,30 @@ export interface Advisor {
 // ─── JSON Data Types (policies.json) ─────────────────────────────────────────
 
 /**
- * A filter that targets tiles whose culture vector has a specific trait
- * above (or below) a threshold. Used to scope loyalty effects.
- *
- * Example: { trait: "ecology", threshold: 0.6 } targets high-ecology tiles.
+ * The loyalty effect of a policy approval.
+ * `trait` — which culture trait determines how strongly a tile reacts.
+ * `modifier` — loyalty delta (in display units) applied to the most extreme tile on this trait.
+ *   Positive = loyalty gain. Negative = loyalty loss.
+ *   Scaled by how far the tile's trait value is from 0.5 (neutral).
+ *   A tile at 0.5 is unaffected. A tile at 1.0 or 0.0 gets the full modifier.
+ * On decline, the effect is negated and scaled by declineModifier.
  */
-export interface LoyaltyFilter {
-  trait: keyof TraitVector;
-  threshold: number;  // 0.0–1.0; tiles with trait value above this are affected
-  above?: boolean;    // default true; set false to target tiles BELOW threshold
-}
-
-/** The loyalty change applied to tiles matching the filter. */
 export interface LoyaltyEffect {
-  filter: LoyaltyFilter;
-  modifier: number; // Flat change to loyalty (e.g. -12 or +6)
-}
-
-/** One choice option within a policy card. */
-export interface PolicyChoice {
-  label: string;                        // Button text: "Approve" / "Reject"
-  alignmentShift: Partial<TraitVector>; // How this choice shifts the player's alignment
-  loyaltyEffect: LoyaltyEffect;         // Which tiles are affected and by how much
-  flavour: string;                      // Short flavor text shown after choosing
+  trait: keyof TraitVector;
+  modifier: number;
 }
 
 /** One policy card from policies.json. */
 export interface Policy {
-  id: string;          // e.g. "pol_coal_subsidies"
-  title: string;       // Display title
-  description: string; // Flavor description shown on the card
-  tags: string[];      // e.g. ["economic", "energy"] — used for filtering / weighting
-  weight: number;      // Base probability weight for being drawn (1.0 = normal)
-  choices: PolicyChoice[];
+  id: string;
+  title: string;
+  description: string;
+  weight?: number;          // Default 1.0 if absent
+  alignmentShift: Partial<TraitVector>; // Approve direction. Decline negates × declineModifier.
+  declineModifier?: number; // Default 1.0 if absent. Scales both alignment and loyalty on decline.
+  loyaltyEffect: LoyaltyEffect;
+  approveEffect?: Omit<ActiveEffect, 'id' | 'sourcePlayerId' | 'targetPlayerIds'>;
+  declineEffect?: Omit<ActiveEffect, 'id' | 'sourcePlayerId' | 'targetPlayerIds'>;
 }
 
 // ─── JSON Data Types (events.json) ───────────────────────────────────────────
@@ -234,6 +226,23 @@ export type OwnedTile = LandTile & {
  */
 export type Tile = WaterTile | UnclaimedTile | BarbarianTile | OwnedTile;
 
+// ─── Active Effects ───────────────────────────────────────────────────────────
+
+export interface ActiveEffect {
+  id: string;
+  sourcePlayerId: string;
+  targetPlayerIds: string[];
+  type: string;
+  scope: 'all_owned' | 'border_tiles' | 'global' | 'specific_player';
+  targeting: 'self' | 'all_opponents' | 'global'; // resolved to targetPlayerIds at apply time
+  magnitude: number;
+  turnsRemaining: number | null; // null = permanent
+  uses: number | null;           // null = unlimited. 1 = consumed on first trigger.
+  enabled: boolean;              // false = effect exists but is currently inactive. Shown faded in UI.
+  icon: string;
+  description: string;
+}
+
 // ─── Player ───────────────────────────────────────────────────────────────────
 
 /**
@@ -243,14 +252,19 @@ export interface Player {
   id: string;                    // e.g. "player_1", "ai_expansionist_1"
   name: string;                  // Display name
   isHuman: boolean;
+  traitVector: TraitVector;      // Original personality; never mutated after init
   alignmentVector: TraitVector;  // Shifts with every policy decision
   confidence: number;            // [0, 1]. Affects propaganda and smear actions.
   governmentType: GovernmentType;
   tribuneIds: string[];          // IDs of selected tribunes (2–3 entries)
+  tribuneSentiment: Record<string, number>; // Per-tribune sentiment score, initialized to 0 at roundtable confirm
   advisorId: string | null;
   personalityId: string | null;  // AI only; references ai_personalities.json
   nationId: string | null;       // References Nation.id; null before roundtable
   imagePath: string | null;
+  activeEffects: ActiveEffect[];
+  capitalTileKey: string | null; // coordKey of the player's capital tile. Null until spawn.
+  budget: number;                // Universal currency. Starts at 100. No spending mechanics yet.
 }
 
 // ─── Notifications ────────────────────────────────────────────────────────────

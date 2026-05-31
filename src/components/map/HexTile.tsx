@@ -1,8 +1,7 @@
 import { hexCorners } from '../../engine/hex';
 import { useUIStore } from '../../store/uiStore';
 import type { Tile, PixelCoord, TraitVector } from '../../types';
-
-export const PLAYER_COLORS = ['#4e9e55', '#c93b3b', '#8b4bbf', '#d966a0'];
+import { PLAYER_COLORS } from './playerColors';
 
 const TILE_FILL: Record<Tile['state'], string> = {
   water:     '#4a5fa3',
@@ -50,15 +49,25 @@ function loyaltyToColor(loyalty: number): string {
   return LOYALTY_STOPS[LOYALTY_STOPS.length - 1][1];
 }
 
+function darkenColor(hex: string, factor: number): string {
+  const clamp = (n: number) => Math.min(255, Math.max(0, n));
+  const r = clamp(Math.round(parseInt(hex.slice(1, 3), 16) * factor));
+  const g = clamp(Math.round(parseInt(hex.slice(3, 5), 16) * factor));
+  const b = clamp(Math.round(parseInt(hex.slice(5, 7), 16) * factor));
+  return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
+}
+
 interface HexTileProps {
   tile: Tile;
   center: PixelCoord;
   size: number;
   playerIndex?: number;
+  isDraftSource?: boolean;
+  isAnnexTarget?: boolean;
   onClick?: () => void;
 }
 
-export function HexTile({ tile, center, size, playerIndex, onClick }: HexTileProps) {
+export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, onClick }: HexTileProps) {
   const activeOverlay = useUIStore((state) => state.activeOverlay);
 
   const points = hexCorners(center, size)
@@ -87,7 +96,17 @@ export function HexTile({ tile, center, size, playerIndex, onClick }: HexTilePro
     fill = TILE_FILL[tile.state];
   }
 
-  return (
+  if (isDraftSource) { fill = '#5a9ecc'; }
+  if (tile.state === 'owned' && tile.activeTroops > 0) { fill = darkenColor(fill, 0.85); }
+
+  if (!document.getElementById('annex-pulse-style')) {
+    const el = document.createElement('style');
+    el.id = 'annex-pulse-style';
+    el.textContent = '@keyframes annexPulse { 0% { opacity: 0 } 50% { opacity: 0.5 } 100% { opacity: 0 } }';
+    document.head.appendChild(el);
+  }
+
+  const basePolygon = (
     <polygon
       points={points}
       fill={fill}
@@ -96,4 +115,19 @@ export function HexTile({ tile, center, size, playerIndex, onClick }: HexTilePro
       style={onClick ? { cursor: 'pointer' } : undefined}
     />
   );
+
+  if (isAnnexTarget) {
+    return (
+      <>
+        {basePolygon}
+        <polygon
+          points={points}
+          fill={PLAYER_COLORS[playerIndex ?? 0]}
+          style={{ animation: 'annexPulse 1.2s ease-in-out infinite', pointerEvents: 'none' }}
+        />
+      </>
+    );
+  }
+
+  return basePolygon;
 }

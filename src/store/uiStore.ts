@@ -34,19 +34,18 @@ interface UIState {
   // ── Map Interaction ───────────────────────────────────────────────────────
   /**
    * The axial coord of the currently selected tile, or null if none.
-   * Set by clicking a HexTile; read by SidePanel to show tile details.
+   * Set by clicking a HexTile; read by TileDetailPanel to show tile details.
    */
   selectedTileCoord: AxialCoord | null;
 
+  /** The axial coord of the tile the mouse is currently over, or null. */
+  hoveredTileCoord: AxialCoord | null;
+
+  /** Current mouse position in client (viewport) coordinates. */
+  tooltipPosition: { x: number; y: number };
+
   /** Which data overlay is active on the map, and whether it is inverted. */
   activeOverlay: { trait: keyof TraitVector | 'loyalty'; inverted: boolean } | null;
-
-  // ── Panel Visibility ──────────────────────────────────────────────────────
-  /** Whether the advisor panel is open. */
-  advisorPanelOpen: boolean;
-
-  /** Whether the intel feed (mobilization log) is visible. */
-  intelFeedOpen: boolean;
 
   // ── Pending Policy Cards ──────────────────────────────────────────────────
   /**
@@ -55,9 +54,27 @@ interface UIState {
    */
   activePolicyCardIndex: number;
 
-  // ── Roundtable ────────────────────────────────────────────────────────────
-  roundtableOpen: boolean;
-  setRoundtableOpen: (open: boolean) => void;
+  // ── Annex Draft ───────────────────────────────────────────────────────────
+  /** True while the player is selecting troop sources for a pending annex. */
+  draftModeActive: boolean;
+  /** The coordKey of the tile the player is drafting an annex toward. */
+  draftClickKey: string | null;
+  /** Troops allocated from each source tile during the current draft session. */
+  draftSources: Record<string, number>;
+  setDraftModeActive: (active: boolean) => void;
+  setDraftClickKey: (key: string | null) => void;
+  setDraftSources: (sources: Record<string, number>) => void;
+
+  // ── Veto ──────────────────────────────────────────────────────────────────
+  vetoResult: { policyId: string; tribuneId: string; originalChoiceIndex: number; finalChoiceIndex: number } | null;
+  setVetoResult: (result: { policyId: string; tribuneId: string; originalChoiceIndex: number; finalChoiceIndex: number }) => void;
+  clearVetoResult: () => void;
+
+  // ── Simulation ────────────────────────────────────────────────────────────
+  simulationMode: boolean;
+  simAutoAdvance: boolean;
+  setSimulationMode: (v: boolean) => void;
+  setSimAutoAdvance: (v: boolean) => void;
 
   // ─── Actions ──────────────────────────────────────────────────────────────
 
@@ -66,11 +83,11 @@ interface UIState {
   /** Called when a player clicks a hex tile. Pass null to deselect. */
   selectTile: (coord: AxialCoord | null) => void;
 
+  setHoveredTile: (coord: AxialCoord | null) => void;
+
+  setTooltipPosition: (pos: { x: number; y: number }) => void;
+
   setActiveOverlay: (overlay: { trait: keyof TraitVector | 'loyalty'; inverted: boolean } | null) => void;
-
-  toggleAdvisorPanel: () => void;
-
-  toggleIntelFeed: () => void;
 
   setActivePolicyCardIndex: (index: number) => void;
 
@@ -82,30 +99,42 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   screen: 'setup',
-  roundtableOpen: true,
+  simulationMode: false,
+  simAutoAdvance: false,
   selectedTileCoord: null,
+  hoveredTileCoord: null,
+  tooltipPosition: { x: 0, y: 0 },
   activeOverlay: null,
-  advisorPanelOpen: false,
-  intelFeedOpen: false,
   activePolicyCardIndex: 0,
+  draftModeActive: false,
+  draftClickKey: null,
+  draftSources: {},
+  vetoResult: null,
+
+  setSimulationMode: (simulationMode) => set({ simulationMode }),
+  setSimAutoAdvance: (simAutoAdvance) => set({ simAutoAdvance }),
 
   setScreen: (screen) => set({ screen }),
 
-  setRoundtableOpen: (roundtableOpen) => set({ roundtableOpen }),
-
   selectTile: (selectedTileCoord) => set({ selectedTileCoord }),
 
+  setHoveredTile: (hoveredTileCoord) => set({ hoveredTileCoord }),
+
+  setTooltipPosition: (tooltipPosition) => set({ tooltipPosition }),
+
   setActiveOverlay: (activeOverlay) => set({ activeOverlay }),
-
-  toggleAdvisorPanel: () =>
-    set((state) => ({ advisorPanelOpen: !state.advisorPanelOpen })),
-
-  toggleIntelFeed: () =>
-    set((state) => ({ intelFeedOpen: !state.intelFeedOpen })),
 
   setActivePolicyCardIndex: (activePolicyCardIndex) =>
     set({ activePolicyCardIndex }),
 
   closeAllPanels: () =>
-    set({ advisorPanelOpen: false, intelFeedOpen: false, selectedTileCoord: null }),
+    set({ selectedTileCoord: null }),
+
+  setDraftModeActive: (draftModeActive) => set({ draftModeActive }),
+  setDraftClickKey: (draftClickKey) => set({ draftClickKey }),
+  setDraftSources: (draftSources) => set({ draftSources }),
+
+  setVetoResult: (vetoResult) => set({ vetoResult }),
+
+  clearVetoResult: () => set({ vetoResult: null }),
 }));

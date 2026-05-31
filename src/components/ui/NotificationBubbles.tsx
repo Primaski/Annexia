@@ -1,65 +1,59 @@
-import { useState } from 'react';
 import { useGameStore } from '../../store/gameStore';
-import { useUIStore } from '../../store/uiStore';
 
-export function NotificationBubbles() {
-  const notifications = useGameStore((state) => state.notifications);
+export function NotificationPanel() {
+  const notifications       = useGameStore((state) => state.notifications);
   const dismissNotification = useGameStore((state) => state.dismissNotification);
-  const setRoundtableOpen = useUIStore((state) => state.setRoundtableOpen);
-  const [hoveredId, setHoveredId] = useState<string | null>(null);
 
-  if (notifications.length === 0) return null;
+  if (notifications.length === 0) {
+    return (
+      <div
+        style={{
+          height: '100%',
+          display: 'flex',
+          alignItems: 'center',
+          justifyContent: 'center',
+          fontFamily: 'monospace',
+          fontSize: 11,
+          color: '#3a5a6a',
+        }}
+      >
+        no notifications
+      </div>
+    );
+  }
 
   return (
-    <div
-      style={{
-        position: 'fixed',
-        left: 12,
-        bottom: 48,
-        zIndex: 30,
-        display: 'flex',
-        flexDirection: 'column-reverse',
-        gap: 8,
-      }}
-    >
+    <div style={{ height: '100%', width: '100%', overflowY: 'auto' }}>
       {notifications.map((n) => (
-        <div key={n.id} style={{ position: 'relative' }}>
-          {hoveredId === n.id && (
-            <div
-              style={{
-                position: 'absolute',
-                bottom: 48,
-                left: 0,
-                background: '#0f1923',
-                color: '#c0c8d0',
-                border: '1px solid #2a3f50',
-                padding: '4px 8px',
-                fontSize: 11,
-                fontFamily: 'monospace',
-                whiteSpace: 'nowrap',
-                pointerEvents: 'none',
-              }}
-            >
-              {n.text}
-            </div>
-          )}
-          <div
-            onClick={() => {
-              dismissNotification(n.id);
-              if (n.id === 'roundtable_minimized') {
-                setRoundtableOpen(true);
-              }
-            }}
-            onMouseEnter={() => setHoveredId(n.id)}
-            onMouseLeave={() => setHoveredId(null)}
+        <div
+          key={n.id}
+          style={{
+            padding: '8px 10px',
+            borderBottom: '1px solid #1e2d3a',
+            fontFamily: 'monospace',
+            fontSize: 11,
+            color: '#c0c8d0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+          }}
+        >
+          <span style={{ flex: 1 }}>{n.text}</span>
+          <button
+            onClick={() => dismissNotification(n.id)}
             style={{
-              width: 40,
-              height: 40,
-              background: '#e0e8f0',
-              borderRadius: '50%',
+              background: 'transparent',
+              border: 'none',
+              color: '#5a7a8a',
               cursor: 'pointer',
+              fontFamily: 'monospace',
+              fontSize: 12,
+              padding: '0 0 0 8px',
+              lineHeight: 1,
             }}
-          />
+          >
+            ×
+          </button>
         </div>
       ))}
     </div>

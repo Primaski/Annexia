@@ -91,6 +91,12 @@ interface GameState {
   // ── Mobilization ──────────────────────────────────────────────────────────
   /** Actions remaining for the current player during mobilization. */
   actionsRemaining: number;
+  /** Log of troop movements made this mobilization phase. Cleared on advanceTurn. */
+  relocatedTroops: { fromKey: string; toKey: string; count: number; ownerId: string }[];
+  /** Running tally of troops committed from each tile this phase. Used by getTotalAvailableTroops. */
+  spentTroopsByTile: Record<string, number>;
+  recordTroopRelocation: (entry: { fromKey: string; toKey: string; count: number; ownerId: string }) => void;
+  clearRelocations: () => void;
 
   // ── Config ────────────────────────────────────────────────────────────────
   config: GameConfig;
@@ -107,6 +113,8 @@ interface GameState {
   // ── Policy Phase ──────────────────────────────────────────────────────────
   /** Cards dealt to the human player for the current policy phase. Cleared on resolution. */
   activePolicyCards: Policy[];
+  /** Index of the card the player is currently resolving within activePolicyCards. */
+  currentPolicyCardIndex: number;
 
   // ─── Actions ──────────────────────────────────────────────────────────────
   // Naming convention: verbs that describe what changes, not what triggers it.
@@ -163,6 +171,7 @@ interface GameState {
   setMapSeed: (seed: number) => void;
 
   setActivePolicyCards: (cards: Policy[]) => void;
+  setCurrentPolicyCardIndex: (n: number) => void;
 
   addNotification: (n: Notification) => void;
   dismissNotification: (id: string) => void;
@@ -191,10 +200,13 @@ const initialState = {
   pendingRoundtable: false,
   roundtableReason: null,
   actionsRemaining: 0,
+  relocatedTroops: [] as { fromKey: string; toKey: string; count: number; ownerId: string }[],
+  spentTroopsByTile: {} as Record<string, number>,
   config: DEFAULT_CONFIG,
   winnerId: null,
   mapSeed: null,
   activePolicyCards: [] as Policy[],
+  currentPolicyCardIndex: 0,
   notifications: [] as Notification[],
 };
 
@@ -236,6 +248,17 @@ export const useGameStore = create<GameState>((set) => ({
       submittedPlayerIds: [...state.submittedPlayerIds, playerId],
     })),
 
+  recordTroopRelocation: (entry) =>
+    set((state) => ({
+      relocatedTroops: [...state.relocatedTroops, entry],
+      spentTroopsByTile: {
+        ...state.spentTroopsByTile,
+        [entry.fromKey]: (state.spentTroopsByTile[entry.fromKey] ?? 0) + entry.count,
+      },
+    })),
+
+  clearRelocations: () => set({ relocatedTroops: [], spentTroopsByTile: {} }),
+
   advanceTurn: () =>
     set((state) => ({
       currentTurn: state.currentTurn + 1,
@@ -243,6 +266,8 @@ export const useGameStore = create<GameState>((set) => ({
       activePlayerId: null,
       submittedPlayerIds: [],
       actionsRemaining: 0,
+      relocatedTroops: [],
+      spentTroopsByTile: {},
     })),
 
   setPendingRoundtable: (reason) =>
@@ -254,6 +279,8 @@ export const useGameStore = create<GameState>((set) => ({
   setActionsRemaining: (actionsRemaining) => set({ actionsRemaining }),
 
   setActivePolicyCards: (activePolicyCards) => set({ activePolicyCards }),
+
+  setCurrentPolicyCardIndex: (currentPolicyCardIndex) => set({ currentPolicyCardIndex }),
 
   addNotification: (n) =>
     set((state) => ({ notifications: [...state.notifications, n] })),

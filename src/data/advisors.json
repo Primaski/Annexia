@@ -2,7 +2,7 @@
   {
     "id": "adv_steward_default",
     "name": "The Steward",
-    "flavourText": "My only interest is the truth of what your people need.",
+    "flavourText": "Democracies grant you more advisors. Autocracies exempt you from vetoes.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=av"
   },
   {

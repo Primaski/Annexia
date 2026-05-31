@@ -1,13 +1,22 @@
+import { useRef, useState, useEffect } from 'react';
 import { useGameStore } from '../../store/gameStore';
 import { useUIStore } from '../../store/uiStore';
 import { coordKey, hexNeighbors, hexCorners } from '../../engine/hex';
 import { useMapLayout } from '../../hooks/useMapLayout';
-import { SIDE_PANEL_WIDTH } from '../ui/SidePanel';
-import { HexTile, PLAYER_COLORS } from './HexTile';
-import type { Tile } from '../../types';
+import { HexTile } from './HexTile';
+import { PLAYER_COLORS } from './playerColors';
+import type { Tile, OwnedTile } from '../../types';
 
 const SQ3 = Math.sqrt(3);
 const PAD = 8;
+
+function darkenHex(hex: string, factor: number): string {
+  const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
+  const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
+  const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
+  const clamp = (n: number) => Math.min(255, Math.max(0, n));
+  return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
+}
 
 // Maps each of the 6 neighbor directions (matching AXIAL_DIRECTIONS order in hex.ts)
 // to the pair of hexCorners indices that form that edge.
@@ -21,16 +30,39 @@ const DIRECTION_CORNERS: [number, number][] = [
 ];
 
 export function HexGrid() {
-  const tiles      = useGameStore((state) => state.tiles);
-  const players    = useGameStore((state) => state.players);
-  const mapCols    = useGameStore((state) => state.config.mapCols);
-  const mapRows    = useGameStore((state) => state.config.mapRows);
-  const selectTile = useUIStore((state) => state.selectTile);
+  const tiles             = useGameStore((state) => state.tiles);
+  const players           = useGameStore((state) => state.players);
+  const phase             = useGameStore((state) => state.phase);
+  const mapCols           = useGameStore((state) => state.config.mapCols);
+  const mapRows           = useGameStore((state) => state.config.mapRows);
+  const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
+  const selectTile         = useUIStore((state) => state.selectTile);
+  const setHoveredTile     = useUIStore((state) => state.setHoveredTile);
+  const setTooltipPosition = useUIStore((state) => state.setTooltipPosition);
+  const draftModeActive    = useUIStore((state) => state.draftModeActive);
+  const draftSources       = useUIStore((state) => state.draftSources);
+  const setDraftClickKey   = useUIStore((state) => state.setDraftClickKey);
+  const selectedTileCoord  = useUIStore((state) => state.selectedTileCoord);
+  const humanPlayer = players.find((p) => p.isHuman);
+
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver((entries) => {
+      const { width, height } = entries[0].contentRect;
+      setContainerSize({ width, height });
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
 
   const playerIndexById = new Map(players.map((p, i) => [p.id, i]));
 
-  const targetW = window.innerWidth  - SIDE_PANEL_WIDTH - 2 * PAD;
-  const targetH = window.innerHeight * 0.96             - 2 * PAD;
+  const targetW = containerSize.width  - 2 * PAD;
+  const targetH = containerSize.height - 2 * PAD;
   const sizeFromW = targetW / (SQ3 * (mapCols + 0.5));
   const sizeFromH = targetH / (1.5 * mapRows + 0.5);
   const hexSize = Math.max(1, Math.floor(Math.min(sizeFromW, sizeFromH)));
@@ -45,19 +77,45 @@ export function HexGrid() {
   const tileList = Object.values(tiles);
 
   return (
+    <div
+      ref={containerRef}
+      style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
     <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
       <g transform={`translate(${xOffset},${yOffset})`}>
         {/* Layer 1: tile fills */}
-        {tileList.map((tile) => (
-          <HexTile
-            key={coordKey(tile.coord)}
-            tile={tile}
-            center={getPixel(tile.coord)}
-            size={hexSize}
-            playerIndex={tile.state === 'owned' ? playerIndexById.get(tile.ownerId) : undefined}
-            onClick={() => selectTile(tile.coord)}
-          />
-        ))}
+        {tileList.map((tile) => {
+          const tKey = coordKey(tile.coord);
+          const owned = tile.state === 'owned' ? tile as OwnedTile : null;
+          const isDraftSource = draftModeActive && owned !== null && owned.ownerId === humanPlayer?.id &&
+            (owned.activeTroops - (spentTroopsByTile[tKey] ?? 0) - (draftSources[tKey] ?? 0)) > 0;
+          const isAnnexTarget = phase === 'mobilization' && draftModeActive &&
+            selectedTileCoord !== null && tKey === coordKey(selectedTileCoord);
+          return (
+            <g
+              key={tKey}
+              onMouseEnter={(e) => { setHoveredTile(tile.coord); setTooltipPosition({ x: e.clientX, y: e.clientY }); }}
+              onMouseMove={(e) => setTooltipPosition({ x: e.clientX, y: e.clientY })}
+              onMouseLeave={() => setHoveredTile(null)}
+            >
+              <HexTile
+                tile={tile}
+                center={getPixel(tile.coord)}
+                size={hexSize}
+                playerIndex={tile.state === 'owned' ? playerIndexById.get(tile.ownerId) : undefined}
+                isDraftSource={isDraftSource}
+                isAnnexTarget={isAnnexTarget}
+                onClick={() => {
+                  if (draftModeActive) {
+                    setDraftClickKey(tKey);
+                  } else {
+                    selectTile(tile.coord);
+                  }
+                }}
+              />
+            </g>
+          );
+        })}
 
         {/* Layer 2: territory border edges */}
         {tileList.flatMap((tile) => {
@@ -67,7 +125,7 @@ export function HexGrid() {
           const corners = hexCorners(center, hexSize);
           const neighbors = hexNeighbors(tile.coord);
           const stroke = tile.state === 'owned'
-            ? PLAYER_COLORS[(playerIndexById.get(tile.ownerId) ?? 0) % PLAYER_COLORS.length]
+            ? darkenHex(PLAYER_COLORS[(playerIndexById.get(tile.ownerId) ?? 0) % PLAYER_COLORS.length], 0.5)
             : '#6B3A2A';
 
           return DIRECTION_CORNERS.flatMap(([c1, c2], k) => {
@@ -98,5 +156,6 @@ export function HexGrid() {
         })}
       </g>
     </svg>
+    </div>
   );
 }
