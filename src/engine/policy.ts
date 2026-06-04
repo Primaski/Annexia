@@ -1,10 +1,22 @@
 import type { Policy, Player, Tribune, Tile, OwnedTile, TraitVector, GovernmentType, ActiveEffect } from '../types';
 import type { TuningConfig } from '../config';
-import { LOYALTY_SCALE } from '../config';
 import { coordKey } from './hex';
 
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
+}
+
+function getTribuneBias(tribune: Tribune, policy: Policy): number {
+  const override = policy.tribuneReactions?.[tribune.id]?.biasOverride;
+  if (override !== undefined) return override;
+  let dot = 0;
+  let shiftMagnitude = 0;
+  for (const [trait, shift] of Object.entries(policy.alignmentShift) as Array<[keyof TraitVector, number]>) {
+    dot += (tribune.traitWeights[trait as keyof TraitVector] ?? 0) * shift;
+    shiftMagnitude += Math.abs(shift);
+  }
+  if (shiftMagnitude === 0) return 0;
+  return Math.max(-1, Math.min(1, dot / shiftMagnitude));
 }
 
 export function drawPolicyCards(
@@ -19,8 +31,7 @@ export function drawPolicyCards(
   const pool: Array<{ policy: Policy; weight: number }> = policies.map(policy => {
     let weight = policy.weight ?? 1.0;
     for (const tribune of tribunes) {
-      const stance = tribune.policyStances[policy.id];
-      if (stance && Math.abs(stance.bias) > 0.5) {
+      if (Math.abs(getTribuneBias(tribune, policy)) > 0.5) {
         weight *= 1.5;
       }
     }
@@ -60,9 +71,9 @@ export function computeSentimentShifts(
 
   for (const tribune of councilTribunes) {
     const currentSentiment = player.tribuneSentiment[tribune.id] ?? 0;
-    const bias = tribune.policyStances[policy.id]?.bias ?? 0;
+    const bias = getTribuneBias(tribune, policy);
 
-    if (bias === 0) {
+    if (Math.abs(bias) < 0.001) {
       result[tribune.id] = currentSentiment;
       continue;
     }
@@ -82,7 +93,7 @@ export function computeSentimentShifts(
 
 export function computeVetoProbability(
   tribune: Tribune,
-  policyId: string,
+  policy: Policy,
   player: Player,
   governmentType: GovernmentType,
   config: TuningConfig['policy']
@@ -92,11 +103,11 @@ export function computeVetoProbability(
     governmentType === 'hybrid'    ? config.vetoCeilingHybrid :
     governmentType === 'autocracy' ? config.vetoCeilingAutocracy :
     0.00;
-  const bias = tribune.policyStances[policyId]?.bias ?? 0;
-  const base_prob = ceiling * Math.abs(bias);
+  const bias = getTribuneBias(tribune, policy);
+  const base_prob = (ceiling * 0.75) * Math.abs(bias);
   const currentSentiment = player.tribuneSentiment[tribune.id] ?? 0;
-  const sentiment_discount = (ceiling / 2) * ((currentSentiment + 1) / 2);
-  const veto_prob = Math.max(0, base_prob - sentiment_discount);
+  const sentiment_discount = (ceiling / 4) * currentSentiment;
+  const veto_prob = Math.max(0, Math.min(ceiling, base_prob - sentiment_discount));
 
   return veto_prob;
 }
@@ -111,9 +122,8 @@ export function resolvePolicyVeto(
   rand: () => number
 ): { finalChoiceIndex: number; vetoingTribuneId: string | null } {
   const eligibleTribunes = councilTribunes.filter(tribune => {
-    const stance = tribune.policyStances[policy.id];
-    if (!stance || stance.bias === 0) return false;
-    const { bias } = stance;
+    const bias = getTribuneBias(tribune, policy);
+    if (Math.abs(bias) < 0.001) return false;
     return (bias > 0 && choiceIndex === 1) || (bias < 0 && choiceIndex === 0);
   });
 
@@ -121,13 +131,11 @@ export function resolvePolicyVeto(
     return { finalChoiceIndex: choiceIndex, vetoingTribuneId: null };
   }
 
-  const tribune = eligibleTribunes.reduce((best, current) => {
-    const bestBias = Math.abs(best.policyStances[policy.id]?.bias ?? 0);
-    const currentBias = Math.abs(current.policyStances[policy.id]?.bias ?? 0);
-    return currentBias > bestBias ? current : best;
-  });
+  const tribune = eligibleTribunes.reduce((best, current) =>
+    Math.abs(getTribuneBias(current, policy)) > Math.abs(getTribuneBias(best, policy)) ? current : best
+  );
 
-  const veto_prob = computeVetoProbability(tribune, policy.id, player, governmentType, config);
+  const veto_prob = computeVetoProbability(tribune, policy, player, governmentType, config);
   const roll = rand();
 
   console.log(`[policy] ${player.name} — Veto check — ${tribune.name}: prob=${veto_prob.toFixed(3)}, roll=${roll.toFixed(3)}`);
@@ -146,23 +154,22 @@ export function applyPolicyChoice(
   finalChoiceIndex: number, // 0 = approve, 1 = decline
   player: Player,
   tiles: Record<string, Tile>,
-  _config: TuningConfig['loyalty']
+  config: TuningConfig['policy']
 ): { updatedPlayer: Player; updatedTiles: Record<string, Tile> } {
   const isDecline = finalChoiceIndex === 1;
   const declineMod = policy.declineModifier ?? 1.0;
 
   // ── Alignment shift ──────────────────────────────────────────────────────
   const newAlignmentVector: TraitVector = { ...player.alignmentVector };
+  const appliedShifts: Partial<TraitVector> = {};
   for (const [trait, shift] of Object.entries(policy.alignmentShift) as Array<[keyof TraitVector, number]>) {
-    const appliedShift = isDecline ? -shift * declineMod : shift;
-    newAlignmentVector[trait] = clamp(newAlignmentVector[trait] + appliedShift, 0, 1);
+    const appliedShift = isDecline ? -shift * declineMod : shift * config.alignmentDriftScale;
+    appliedShifts[trait as keyof TraitVector] = appliedShift;
+    newAlignmentVector[trait] = clamp(newAlignmentVector[trait] + appliedShift, -1, 1);
   }
   let updatedPlayer: Player = { ...player, alignmentVector: newAlignmentVector };
 
   // ── Loyalty effect ───────────────────────────────────────────────────────
-  const { trait, modifier } = policy.loyaltyEffect;
-  const appliedModifier = isDecline ? -modifier * declineMod : modifier;
-
   const updatedTiles: Record<string, Tile> = {};
   for (const tile of Object.values(tiles)) {
     const key = coordKey(tile.coord);
@@ -171,12 +178,18 @@ export function applyPolicyChoice(
       continue;
     }
     const ownedTile = tile as OwnedTile;
-    const offset = ownedTile.cultureVector[trait] - 0.5; // range [-0.5, +0.5]
-    const normalized = offset / 0.5;                      // range [-1, +1]
-    const delta = Math.round(appliedModifier * normalized * LOYALTY_SCALE);
+    if (ownedTile.ownerId !== player.id) {
+      updatedTiles[key] = ownedTile;
+      continue;
+    }
+    let delta = 0;
+    for (const [trait, appliedShift] of Object.entries(appliedShifts) as Array<[keyof TraitVector, number]>) {
+      delta += appliedShift * ownedTile.cultureVector[trait as keyof TraitVector];
+    }
+    delta *= config.loyaltyModifierScale;
     updatedTiles[key] = {
       ...ownedTile,
-      loyalty: clamp(ownedTile.loyalty + delta, -10000, 10000),
+      loyalty: clamp(ownedTile.loyalty + clamp(delta, -1, 1), -1, 1),
     };
   }
 
@@ -194,6 +207,7 @@ export function applyPolicyChoice(
       sourcePlayerId: player.id,
       targetPlayerIds,
       enabled: true,
+      suspendable: false,
     };
 
     updatedPlayer = {

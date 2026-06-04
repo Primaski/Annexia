@@ -4,17 +4,37 @@ import { generateMap } from '../engine/mapGen';
 import { spawnPlayers } from '../engine/spawnPlayers';
 import { SPAWN_LOYALTY, calculateLoyaltyTarget, stepLoyalty, isBreakawayCandidate, cosineSimilarity } from '../engine/loyalty';
 import { coordKey, hexDistance, hexNeighbors, isInGrid, parseCoordKey } from '../engine/hex';
-import { getAnnexableTiles, annexTile, getTotalAvailableTroops } from '../engine/mobilization';
+import { getAnnexableTiles, annexTile, getTotalAvailableTroops, fortifyTile, invadeTile, getInvadableTileKeys } from '../engine/mobilization';
 import { DEFAULT_CONFIG } from '../config';
 import { generateName } from '../engine/names';
 import tribunesData from '../data/tribunes.json';
-import type { Tile, OwnedTile, BarbarianTile, Player, GovernmentType, Nation, Tribune, AIPersonality, TraitVector, Policy, ActiveEffect } from '../types';
+import type { Tile, OwnedTile, BarbarianTile, Player, GovernmentType, Nation, Tribune, AIPersonality, TraitVector, Policy, ActiveEffect, LoyaltyLogEntry } from '../types';
 import aiPersonalitiesData from '../data/ai_personalities.json';
 import policiesData from '../data/policies.json';
 import { useUIStore } from '../store/uiStore';
 import { drawPolicyCards, computeSentimentShifts, resolvePolicyVeto, applyPolicyChoice, chooseAIPolicyOption } from '../engine/policy';
 
 let simStepInProgress = false;
+
+export type RelocationEntry = { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' };
+
+export function getMilitarySpentByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const e of relocatedTroops) {
+    if (e.actionType !== 'military') continue;
+    result[e.fromKey] = (result[e.fromKey] ?? 0) + e.count;
+  }
+  return result;
+}
+
+export function getReceivedPassiveByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
+  const result: Record<string, number> = {};
+  for (const e of relocatedTroops) {
+    if (e.actionType !== 'passive') continue;
+    result[e.toKey] = (result[e.toKey] ?? 0) + e.count;
+  }
+  return result;
+}
 
 // Mulberry32 seeded PRNG — same algorithm as mapGen.ts, kept local to avoid coupling.
 function mulberry32(seed: number): () => number {
@@ -100,8 +120,8 @@ export function useMapGen(): void {
           id: `player_${i + 1}`,
           name: `Player ${i + 1}`,
           isHuman: true,
-          traitVector: { ecology: 0.5, militarism: 0.5, religion: 0.5, liberty: 0.5, progress: 0.5 },
-          alignmentVector: { ecology: 0.5, militarism: 0.5, religion: 0.5, liberty: 0.5, progress: 0.5 },
+          traitVector: { ecology: 0, militarism: 0, religion: 0, liberty: 0, progress: 0 },
+          alignmentVector: { ecology: 0, militarism: 0, religion: 0, liberty: 0, progress: 0 },
           confidence: 0.5,
           governmentType: 'none' as GovernmentType,
           advisorId: null,
@@ -112,7 +132,7 @@ export function useMapGen(): void {
           imagePath: null,
           activeEffects: [
             {
-              id: 'eff_voluntary_enlistment',
+              id: `eff_voluntary_enlistment_player_${i + 1}`,
               sourcePlayerId: `player_${i + 1}`,
               targetPlayerIds: [`player_${i + 1}`],
               type: 'troop_income',
@@ -122,11 +142,13 @@ export function useMapGen(): void {
               turnsRemaining: null,
               uses: null,
               enabled: true,
+              suspendable: true,
+              title: 'Voluntary Enlistment',
               icon: '⚔️',
-              description: 'Citizens voluntarily enlist each turn, providing passive troop income to your capital.',
+              description: 'Willing hands take up arms. The capital is never without defenders.',
             },
             {
-              id: 'eff_civic_levy',
+              id: `eff_civic_levy_player_${i + 1}`,
               sourcePlayerId: `player_${i + 1}`,
               targetPlayerIds: [`player_${i + 1}`],
               type: 'budget_income',
@@ -136,8 +158,10 @@ export function useMapGen(): void {
               turnsRemaining: null,
               uses: null,
               enabled: true,
+              suspendable: true,
+              title: 'Civic Levy',
               icon: '💰',
-              description: 'Citizens pay taxes each turn, providing passive budget income.',
+              description: 'Tax day comes every season. The coffers fill, steadily.',
             },
           ] as ActiveEffect[],
           capitalTileKey: coordKey(spawnResults[i].spawnCoord),
@@ -161,7 +185,7 @@ export function useMapGen(): void {
         imagePath: personality.imagePath,
         activeEffects: [
           {
-            id: 'eff_voluntary_enlistment',
+            id: `eff_voluntary_enlistment_player_${i + 1}`,
             sourcePlayerId: `player_${i + 1}`,
             targetPlayerIds: [`player_${i + 1}`],
             type: 'troop_income',
@@ -171,11 +195,13 @@ export function useMapGen(): void {
             turnsRemaining: null,
             uses: null,
             enabled: true,
+            suspendable: true,
+            title: 'Voluntary Enlistment',
             icon: '⚔️',
             description: 'Citizens voluntarily enlist each turn, providing passive troop income to your capital.',
           },
           {
-            id: 'eff_civic_levy',
+            id: `eff_civic_levy_player_${i + 1}`,
             sourcePlayerId: `player_${i + 1}`,
             targetPlayerIds: [`player_${i + 1}`],
             type: 'budget_income',
@@ -185,6 +211,8 @@ export function useMapGen(): void {
             turnsRemaining: null,
             uses: null,
             enabled: true,
+            suspendable: true,
+            title: 'Civic Levy',
             icon: '💰',
             description: 'Citizens pay taxes each turn, providing passive budget income.',
           },
@@ -213,6 +241,7 @@ export function useMapGen(): void {
           suppression: 0,
           defense: 0,
           activeTroops: key === spawnKey ? DEFAULT_CONFIG.mobilization.spawnTroops : 0,
+        loyaltyLog: [],
         } as OwnedTile);
       }
     }
@@ -234,6 +263,7 @@ export function useMapGen(): void {
     // Step 7: Dispatch to store
     setTiles(tileRecord);
     setPlayers(players);
+    useUIStore.getState().setViewingPlayerId(players[0].id);
     useGameStore.getState().setNations({ ...nationsRecord, ...playerNationsRecord });
     setMapSeed(seed);
     useGameStore.getState().setPendingRoundtable('game_start');
@@ -261,7 +291,7 @@ export function processAITurns(): void {
     for (const card of cards) {
       const currentPlayer = useGameStore.getState().players.find(p => p.id === player.id)!;
       const choiceIndex = chooseAIPolicyOption(card, currentPlayer);
-      console.log(`[policy] ${currentPlayer.name} — ${choiceIndex === 0 ? 'Approve' : 'Decline'} "${card.title}"`);
+      console.log(`[DEBUG] ${currentPlayer.name} — ${choiceIndex === 0 ? 'Approve' : 'Decline'} "${card.title}"`);
 
       const { finalChoiceIndex, vetoingTribuneId } = resolvePolicyVeto(
         card, choiceIndex, currentPlayer, councilTribunes, currentPlayer.governmentType, DEFAULT_CONFIG.policy, rand,
@@ -270,7 +300,7 @@ export function processAITurns(): void {
       if (vetoingTribuneId !== null) {
         const vetoingTribune = useGameStore.getState().tribunes.find(t => t.id === vetoingTribuneId);
         const tribuneName = vetoingTribune?.name ?? vetoingTribuneId;
-        console.log(`[policy] ${currentPlayer.name} — ${tribuneName} vetoes "${card.title}" → ${finalChoiceIndex === 0 ? 'Approve' : 'Decline'}`);
+        console.log(`[DEBUG] ${currentPlayer.name} — ${tribuneName} vetoes "${card.title}" → ${finalChoiceIndex === 0 ? 'Approve' : 'Decline'}`);
       }
 
       const sentimentShifts = computeSentimentShifts(card, choiceIndex, currentPlayer, councilTribunes, DEFAULT_CONFIG.policy);
@@ -278,10 +308,13 @@ export function processAITurns(): void {
       useGameStore.getState().updatePlayer(player.id, { tribuneSentiment: updatedSentiment });
 
       const { updatedPlayer, updatedTiles } = applyPolicyChoice(
-        card, finalChoiceIndex, currentPlayer, useGameStore.getState().tiles, DEFAULT_CONFIG.loyalty,
+        card, finalChoiceIndex, currentPlayer, useGameStore.getState().tiles, DEFAULT_CONFIG.policy,
       );
       useGameStore.getState().setTiles(updatedTiles);
-      useGameStore.getState().updatePlayer(player.id, { alignmentVector: updatedPlayer.alignmentVector });
+      useGameStore.getState().updatePlayer(player.id, {
+        alignmentVector: updatedPlayer.alignmentVector,
+        activeEffects: updatedPlayer.activeEffects,
+      });
     }
 
     useGameStore.getState().markPolicySubmitted(player.id);
@@ -290,12 +323,23 @@ export function processAITurns(): void {
 }
 
 export function startPolicyPhase(): void {
+  const currentTiles = useGameStore.getState().tiles;
+  const clearedTiles: Record<string, Tile> = { ...currentTiles };
+  for (const key of Object.keys(clearedTiles)) {
+    const t = clearedTiles[key];
+    if (t.state === 'owned') {
+      clearedTiles[key] = { ...(t as OwnedTile), loyaltyLog: [] };
+    }
+  }
+  useGameStore.getState().setTiles(clearedTiles);
+
   const { players, tribunes } = useGameStore.getState();
   const aiPlayersWithoutTribunes = players.filter(p => !p.isHuman && p.tribuneIds.length === 0);
   if (aiPlayersWithoutTribunes.length > 0) initAIRoundtable();
 
   const { setActivePolicyCards, setCurrentPolicyCardIndex } = useGameStore.getState();
-  const humanPlayer = players.find((p) => p.isHuman);
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const humanPlayer = players.find((p) => p.id === viewingPlayerId);
   if (humanPlayer) {
     const councilTribunes = tribunes.filter((t) => humanPlayer.tribuneIds.includes(t.id));
     const rand = mulberry32(Date.now());
@@ -359,8 +403,9 @@ export function advanceSimStep(): void {
 export function submitPolicyChoice(choiceIndex: number): void {
   const { activePolicyCards, currentPolicyCardIndex, players, tribunes } = useGameStore.getState();
   const policy = activePolicyCards[currentPolicyCardIndex];
-  const humanPlayer = players.find((p) => p.isHuman)!;
-  const councilTribunes = tribunes.filter((t) => humanPlayer.tribuneIds.includes(t.id));
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const humanPlayer = players.find((p) => p.id === viewingPlayerId)!;
+const councilTribunes = tribunes.filter((t) => humanPlayer.tribuneIds.includes(t.id));
   const rand = mulberry32(Date.now());
 
   // Resolve veto first, using pre-update sentiment (humanPlayer read before any store writes)
@@ -383,10 +428,26 @@ export function submitPolicyChoice(choiceIndex: number): void {
   const tiles = useGameStore.getState().tiles;
   const freshPlayer = useGameStore.getState().players.find((p) => p.id === humanPlayer.id)!;
   const { updatedPlayer: appliedPlayer, updatedTiles } = applyPolicyChoice(
-    policy, finalChoiceIndex, freshPlayer, tiles, DEFAULT_CONFIG.loyalty,
+    policy, finalChoiceIndex, freshPlayer, tiles, DEFAULT_CONFIG.policy,
   );
-  useGameStore.getState().setTiles(updatedTiles);
-  useGameStore.getState().updatePlayer(humanPlayer.id, { alignmentVector: appliedPlayer.alignmentVector });
+
+  const policyLabel = 'Policy: ' + policy.title;
+  const tilesWithLog: Record<string, Tile> = { ...updatedTiles };
+  for (const [key, updatedTile] of Object.entries(updatedTiles)) {
+    if (updatedTile.state !== 'owned') continue;
+    const previousTile = tiles[key] as OwnedTile;
+    const delta = (updatedTile as OwnedTile).loyalty - previousTile.loyalty;
+    if (delta === 0) continue;
+    tilesWithLog[key] = {
+      ...(updatedTile as OwnedTile),
+      loyaltyLog: [...(updatedTile as OwnedTile).loyaltyLog, { label: policyLabel, delta } as LoyaltyLogEntry],
+    };
+  }
+  useGameStore.getState().setTiles(tilesWithLog);
+  useGameStore.getState().updatePlayer(humanPlayer.id, {
+    alignmentVector: appliedPlayer.alignmentVector,
+    activeEffects: appliedPlayer.activeEffects,
+  });
 
   // Advance card or surface veto screen
   if (vetoingTribuneId !== null) {
@@ -418,7 +479,8 @@ export function startMobilizationPhase(): void {
 
 export function getAnnexableTileKeys(): Set<string> {
   const { tiles, players, config, spentTroopsByTile } = useGameStore.getState();
-  const human = players.find((p) => p.isHuman);
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const human = players.find((p) => p.id === viewingPlayerId);
   if (!human) return new Set();
 
   const visited = new Set<string>();
@@ -448,9 +510,68 @@ export function getAnnexableTileKeys(): Set<string> {
   return result;
 }
 
+export function getInvadableTileKeysForPlayer(): Set<string> {
+  const { tiles, players, config } = useGameStore.getState();
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const human = players.find((p) => p.id === viewingPlayerId);
+  if (!human) return new Set();
+  return getInvadableTileKeys(tiles, human.id, config.mapCols, config.mapRows);
+}
+
+export function performInvade(targetKey: string, troopSources: Record<string, number>): void {
+  const state = useGameStore.getState();
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const human = state.players.find((p) => p.id === viewingPlayerId)!;
+
+  const validNeighborKeys = new Set(hexNeighbors(parseCoordKey(targetKey)).map(coordKey));
+  for (const sourceKey of Object.keys(troopSources)) {
+    if (!validNeighborKeys.has(sourceKey)) {
+      throw new Error(`performInvade: source tile ${sourceKey} is not adjacent to target`);
+    }
+  }
+
+  const tileName = (state.tiles[targetKey] as BarbarianTile).name;
+
+  const { newTiles, result } = invadeTile(
+    state.tiles, targetKey, human.id, human.nationId!, troopSources,
+    DEFAULT_CONFIG.combat.lanchesterExponent, DEFAULT_CONFIG.combat.defenderBonus, () => Math.random(),
+  );
+
+  useGameStore.getState().setTiles(newTiles);
+
+  for (const [sourceKey, count] of Object.entries(troopSources)) {
+    useGameStore.getState().recordTroopRelocation({
+      fromKey: sourceKey,
+      toKey: targetKey,
+      count,
+      ownerId: human.id,
+      actionType: 'military',
+    });
+  }
+
+  useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.invadeAPCost);
+
+  useGameStore.getState().addNotification(
+    result.attackerWon
+      ? {
+          id: `notif_invade_win_${targetKey}_${Date.now()}`,
+          text: `⚔️ ${tileName} conquered! ${result.attackerSurvivors} troops remain.`,
+          severity: 'info',
+          playerId: human.id,
+        }
+      : {
+          id: `notif_invade_loss_${targetKey}_${Date.now()}`,
+          text: `⚔️ Attack on ${tileName} failed. All troops lost.`,
+          severity: 'warning',
+          playerId: human.id,
+        },
+  );
+}
+
 export function performAnnex(targetKey: string, troopSources: Record<string, number>): void {
   const state = useGameStore.getState();
-  const human = state.players.find((p) => p.isHuman)!;
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId;
+  const human = state.players.find((p) => p.id === viewingPlayerId)!;
 
   const ownedNeighborKey = hexNeighbors(parseCoordKey(targetKey))
     .map((c) => coordKey(c))
@@ -470,12 +591,42 @@ export function performAnnex(targetKey: string, troopSources: Record<string, num
   useGameStore.getState().recordTroopRelocation({
     fromKey: targetKey,
     toKey: targetKey,
-    count: DEFAULT_CONFIG.mobilization.annexTroopCost,
+    count: totalMoved,
     ownerId: human.id,
+    actionType: 'military',
   });
-  for (let i = 0; i < totalMoved; i++) {
-    useGameStore.getState().spendAction();
+  useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.annexAPCost);
+}
+
+export function performFortify(targetKey: string, troopSources: Record<string, number>): void {
+  const state = useGameStore.getState();
+  const viewingPlayerId = useUIStore.getState().viewingPlayerId!;
+  const human = state.players.find((p) => p.id === viewingPlayerId)!;
+
+  const ownedNeighborKey = hexNeighbors(parseCoordKey(targetKey))
+    .map((c) => coordKey(c))
+    .find((k) => state.tiles[k]?.state === 'owned' && (state.tiles[k] as OwnedTile).ownerId === human.id);
+  if (ownedNeighborKey) {
+    const reachable = getConnectedOwnedRegion(state.tiles, ownedNeighborKey, human.id);
+    for (const sourceKey of Object.keys(troopSources)) {
+      if (!reachable.has(sourceKey)) {
+        throw new Error('performFortify: troop source is not connected to target');
+      }
+    }
   }
+
+  const updatedTiles = fortifyTile(state.tiles, targetKey, human.id, troopSources);
+  useGameStore.getState().setTiles(updatedTiles);
+  for (const [sourceKey, count] of Object.entries(troopSources)) {
+    useGameStore.getState().recordTroopRelocation({
+      fromKey: sourceKey,
+      toKey: targetKey,
+      count,
+      ownerId: human.id,
+      actionType: 'passive',
+    });
+  }
+  useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.fortifyAPCost);
 }
 
 function getConnectedOwnedRegion(
@@ -506,7 +657,7 @@ function getConnectedOwnedRegion(
 
 export function performAIAnnex(): void {
   const { players, config } = useGameStore.getState();
-  const maxAttempts = Math.floor(DEFAULT_CONFIG.mobilization.startingAP / DEFAULT_CONFIG.mobilization.annexTroopCost);
+  const maxAttempts = Math.floor(DEFAULT_CONFIG.mobilization.startingAP / DEFAULT_CONFIG.mobilization.annexAPCost);
   for (let i = 0; i < players.length; i++) {
     const player = players[i];
     if (player.isHuman || !player.nationId) continue;
@@ -518,8 +669,8 @@ export function performAIAnnex(): void {
 
     for (let attempt = 0; attempt < maxAttempts && annexable.length > 0; attempt++) {
       const totalAvailable = getTotalAvailableTroops(currentTiles, player.id, localSpent);
-      if (totalAvailable < DEFAULT_CONFIG.mobilization.annexTroopCost) break;
-      if (apRemaining < DEFAULT_CONFIG.mobilization.annexTroopCost) break;
+      if (totalAvailable < DEFAULT_CONFIG.mobilization.annexTroopMin) break;
+      if (apRemaining < DEFAULT_CONFIG.mobilization.annexAPCost) break;
 
       const idx = Math.floor(rand() * annexable.length);
       const targetKey = annexable.splice(idx, 1)[0];
@@ -531,7 +682,7 @@ export function performAIAnnex(): void {
       const reachableRegion = getConnectedOwnedRegion(currentTiles, ownedNeighborKey, player.id);
 
       const sources: Record<string, number> = {};
-      let needed = DEFAULT_CONFIG.mobilization.annexTroopCost;
+      let needed = DEFAULT_CONFIG.mobilization.annexTroopMin;
       for (const [key, tile] of Object.entries(currentTiles)) {
         if (needed <= 0) break;
         if (!reachableRegion.has(key)) continue;
@@ -545,11 +696,11 @@ export function performAIAnnex(): void {
       if (needed > 0) break;
 
       currentTiles = annexTile(currentTiles, targetKey, player.id, player.nationId, sources);
-      console.log(`[mobilization] ${player.name} annexes ${targetKey}`);
+      console.log(`[DEBUG] ${player.name} annexes ${targetKey}`);
       for (const [fromKey, count] of Object.entries(sources)) {
         localSpent[fromKey] = (localSpent[fromKey] ?? 0) + count;
-        apRemaining -= count;
       }
+      apRemaining -= DEFAULT_CONFIG.mobilization.annexAPCost;
     }
     useGameStore.getState().setTiles(currentTiles);
   }
@@ -585,7 +736,7 @@ export function resolveTurn(): void {
       .map((neighbor) => playerMap.get(neighbor.ownerId)?.alignmentVector)
       .filter((v): v is Player['alignmentVector'] => v !== undefined);
 
-    const newTarget = calculateLoyaltyTarget(
+    const { target: newTarget } = calculateLoyaltyTarget(
       ownerPlayer.alignmentVector,
       owned.cultureVector,
       enemyNeighborAlignments,
@@ -593,8 +744,29 @@ export function resolveTurn(): void {
     );
 
     const stepped = stepLoyalty(owned.loyalty, newTarget, DEFAULT_CONFIG.loyalty.momentumRate);
+    const driftDelta = stepped - owned.loyalty;
 
-    updatedTiles[key] = { ...owned, loyalty: stepped, loyaltyTarget: newTarget };
+    const warningThreshold = DEFAULT_CONFIG.loyalty.secessionWarningThreshold;
+    const breakawayThreshold = DEFAULT_CONFIG.loyalty.breakawayThreshold;
+    const wasAboveWarning = owned.loyalty > warningThreshold;
+    const isBelowWarning = stepped <= warningThreshold;
+    const notYetBreaking = stepped > breakawayThreshold;
+
+    if (owned.ownerId === useUIStore.getState().viewingPlayerId && wasAboveWarning && isBelowWarning && notYetBreaking) {
+      useGameStore.getState().addNotification({
+        id: `notif_secession_${key}_${Date.now()}`,
+        text: `⚠ ${owned.name} is dangerously close to breaking away.`,
+        severity: 'warning',
+        playerId: owned.ownerId,
+      });
+    }
+
+    const turnLog: LoyaltyLogEntry[] = [
+      ...owned.loyaltyLog.filter(e => e.label.startsWith('Policy:')),
+      { label: 'Drift', delta: driftDelta },
+    ];
+
+    updatedTiles[key] = { ...owned, loyalty: stepped, loyaltyTarget: newTarget, loyaltyLog: turnLog };
   }
 
   // Step 3 — Breakaway pass
@@ -620,13 +792,21 @@ export function resolveTurn(): void {
         nationId = id;
       }
 
+      useGameStore.getState().addNotification({
+        id: `notif_breakaway_${key}_${Date.now()}`,
+        text: `BREAKING: ${(tile as OwnedTile).name} breaks away from ${playerMap.get((tile as OwnedTile).ownerId)?.name ?? 'its ruler'}!`,
+        severity: 'breaking',
+        playerId: 'global',
+      });
+
       updatedTiles[key] = {
         coord: tile.coord,
         state: 'barbarian',
         cultureVector: tile.cultureVector,
         name: tile.name,
         nationId,
-        defense: Math.floor(Math.random() * 26) + 25,
+        activeTroops: Math.max(5, (tile as OwnedTile).activeTroops),
+        previousOwner: (tile as OwnedTile).ownerId,
       } as BarbarianTile;
     }
   }
@@ -643,12 +823,34 @@ export function resolveTurn(): void {
       tileCount++;
     }
     const avgLoyalty = tileCount === 0 ? 0 : loyaltySum / tileCount;
-
+    console.log(`[effects] ${player.id} avgLoyalty=${avgLoyalty}, thresholds: troop=${DEFAULT_CONFIG.mobilization.troopIncomeSuspendThreshold} budget=${DEFAULT_CONFIG.mobilization.budgetIncomeSuspendThreshold}`);
+    
     const updatedEffects = player.activeEffects.map(e => {
-      if (e.type === 'troop_income') return { ...e, enabled: avgLoyalty >= DEFAULT_CONFIG.mobilization.troopIncomeSuspendThreshold };
-      if (e.type === 'budget_income') return { ...e, enabled: avgLoyalty >= DEFAULT_CONFIG.mobilization.budgetIncomeSuspendThreshold };
+      if (e.type === 'troop_income' && e.suspendable) return { ...e, enabled: avgLoyalty >= DEFAULT_CONFIG.mobilization.troopIncomeSuspendThreshold };
+      if (e.type === 'budget_income' && e.suspendable) return { ...e, enabled: avgLoyalty >= DEFAULT_CONFIG.mobilization.budgetIncomeSuspendThreshold };
       return e;
     });
+
+    for (let i = 0; i < updatedEffects.length; i++) {
+      const prev = player.activeEffects[i];
+      const next = updatedEffects[i];
+      if (!prev || !next) continue;
+      if (prev.enabled && !next.enabled) {
+        useGameStore.getState().addNotification({
+          id: `notif_suspend_${next.id}_${Date.now()}`,
+          text: `⚠ ${next.title} has been suspended — your people's loyalty is too low.`,
+          severity: 'warning',
+          playerId: player.id,
+        });
+      } else if (!prev.enabled && next.enabled) {
+        useGameStore.getState().addNotification({
+          id: `notif_restore_${next.id}_${Date.now()}`,
+          text: `✓ ${next.title} has been restored.`,
+          severity: 'info',
+          playerId: player.id,
+        });
+      }
+    }
 
     let updatedBudget = player.budget;
     let updatedCapitalTileKey = player.capitalTileKey;

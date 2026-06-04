@@ -9,9 +9,6 @@
  * - Loyalty Drift: Moves by (gap * momentumRate) per turn. 1.0 snaps instantly; 0.2 moves 20% of gap.
  */
 
-// Internal loyalty range is [-10000, +10000]. Divide by LOYALTY_SCALE to get display value [-100, +100].
-export const LOYALTY_SCALE = 100;
-
 export interface TuningConfig {
   map: {
     landRatio: number;          // Target fraction of land tiles (approximated via Voronoi/noise).
@@ -22,7 +19,8 @@ export interface TuningConfig {
   };
   loyalty: {
     neighborPressureStrength: number; // Multiplier for neighbor tile pull during calculation.
-    breakawayThreshold: number;       // Internal units. Tile is a breakaway candidate when loyalty ≤ this value.
+    breakawayThreshold: number;       // [-1, 1] range. Tile secedes when loyalty falls to or below this value.
+    secessionWarningThreshold: number; // [-1, 1] range. Tile triggers a warning notification when loyalty crosses below this value.
     momentumRate: number;             // Drift speed toward target. Percentage of gap closed per turn.
   };
   policy: {
@@ -30,14 +28,24 @@ export interface TuningConfig {
     vetoCeilingDemocracy: number;  // Max veto probability in a democracy (applied × |bias|).
     vetoCeilingHybrid: number;     // Max veto probability in a hybrid government.
     vetoCeilingAutocracy: number;  // Max veto probability in an autocracy (typically 0).
+    alignmentDriftScale: number;   // Multiplier applied to alignmentShift when updating player alignment.
+    loyaltyModifierScale: number;  // Multiplier applied to alignmentShift when computing tile loyalty deltas.
   };
   mobilization: {
-    startingAP: number;      // Action points available at the start of each mobilization phase.
-    annexTroopCost: number;  // Troops consumed from sources to annex one unclaimed tile.
-    spawnTroops: number;     // Troops placed on a player's spawn tile at game start.
-    startingBudget: number;  // Budget given to each player at game start.
-    troopIncomeSuspendThreshold: number;   // avg loyalty below this disables troop_income effects
-    budgetIncomeSuspendThreshold: number;  // avg loyalty below this disables budget_income effects
+    startingAP: number;        // Action points available at the start of each mobilization phase.
+    fortifyAPCost: number;     // Flat AP cost to fortify a tile (troop move).
+    annexAPCost: number;       // Flat AP cost to annex one unclaimed tile.
+    annexTroopMin: number;     // Minimum troops that must be committed to annex.
+    invadeAPCost: number;      // Flat AP cost to launch an invasion.
+    invadeTroopMin: number;    // Minimum troops that must be committed to invade.
+    spawnTroops: number;       // Troops placed on a player's spawn tile at game start.
+    startingBudget: number;    // Budget given to each player at game start.
+    troopIncomeSuspendThreshold: number;   // [-1, 1]. Avg tile loyalty below this disables troop_income effects.
+    budgetIncomeSuspendThreshold: number;  // [-1, 1]. Avg tile loyalty below this disables budget_income effects.
+  };
+  combat: {
+    lanchesterExponent: number; // Controls how steeply army size matters in win probability. Default 3.
+    defenderBonus: number;      // Multiplier applied to defender strength before computing odds. Default 1.07.
   };
 }
 
@@ -51,21 +59,32 @@ export const DEFAULT_CONFIG: TuningConfig = {
   },
   loyalty: {
     neighborPressureStrength: 1.0,
-    breakawayThreshold: 2000,
-    momentumRate: 0.2,
+    breakawayThreshold: -0.8,
+    secessionWarningThreshold: -0.5,
+    momentumRate: 0.1,
   },
   policy: {
     tribuneSentimentShift: 0.15,
     vetoCeilingDemocracy: 0.50,
     vetoCeilingHybrid: 0.25,
     vetoCeilingAutocracy: 0.00,
+    alignmentDriftScale: 4.0,
+    loyaltyModifierScale: 6.0,
   },
   mobilization: {
-    startingAP: 10,
-    annexTroopCost: 5,
+    startingAP: 20,
+    fortifyAPCost: 1,
+    annexAPCost: 5,
+    annexTroopMin: 1,
+    invadeAPCost: 10,
+    invadeTroopMin: 5,
     spawnTroops: 8,
     startingBudget: 90,
-    troopIncomeSuspendThreshold: -2500,
-    budgetIncomeSuspendThreshold: -4000,
+    troopIncomeSuspendThreshold: -0.15,
+    budgetIncomeSuspendThreshold: -0.35,
+  },
+  combat: {
+    lanchesterExponent: 3,
+    defenderBonus: 1.07,
   },
 };

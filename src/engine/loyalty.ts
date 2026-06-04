@@ -1,8 +1,7 @@
 /**
  * loyalty.ts — Loyalty calculation and breakaway detection.
  *
- * Loyalty is stored in internal units [-10000, +10000].
- * Divide by LOYALTY_SCALE (config.ts) to get the display value [-100, +100].
+ * Loyalty is a float in [-1, +1]. Multiply by 100 to get the display value [-100, +100].
  *
  * Pure TypeScript. No React, no Zustand.
  */
@@ -10,7 +9,7 @@
 import type { TraitVector } from '../types';
 import type { TuningConfig } from '../config';
 
-export const SPAWN_LOYALTY = 3000; // Internal units. = +30 display.
+export const SPAWN_LOYALTY = 0.3;
 
 const TRAIT_KEYS: (keyof TraitVector)[] = [
   'ecology', 'militarism', 'religion', 'liberty', 'progress',
@@ -35,42 +34,29 @@ export function cosineSimilarity(a: TraitVector, b: TraitVector): number {
   return dot / (Math.sqrt(magA) * Math.sqrt(magB));
 }
 
-/**
- * Compute the loyalty target for an owned tile in internal units.
- *
- * 1. Base: cosineSimilarity(ownerAlignment, tileCulture) × 10000, rounded.
- * 2. Neighbor pressure: max(0, bestEnemySim − ownerSim) × strength × 10000, rounded.
- *    bestEnemySim is the highest similarity any enemy neighbor's alignment has
- *    with the tile's culture. Pressure = 0 if there are no enemy neighbors.
- * 3. Return clamp(base − pressure, −10000, +10000).
- */
 export function calculateLoyaltyTarget(
   ownerAlignment: TraitVector,
   tileCulture: TraitVector,
   enemyNeighborAlignments: TraitVector[],
   config: TuningConfig['loyalty']
-): number {
-  // TODO: neighbor pressure uses cosine ownerSim — should be MAD-based for consistency
-  const ownerSim = cosineSimilarity(ownerAlignment, tileCulture);
-  const traitKeys: (keyof TraitVector)[] = [
-    'ecology', 'militarism', 'religion', 'liberty', 'progress',
-  ];
-  const mad = traitKeys.reduce((sum, k) => sum + Math.abs(ownerAlignment[k] - tileCulture[k]), 0) / traitKeys.length;
-  const base = Math.round((1 - mad * 2) * 10000);
+): { target: number } {
+  const mad = TRAIT_KEYS.reduce(
+    (sum, k) => sum + Math.abs(ownerAlignment[k] - tileCulture[k]), 0
+  ) / TRAIT_KEYS.length;
+  const base = clamp(1 - mad * 2, -1, 1);
 
   let pressure = 0;
   if (enemyNeighborAlignments.length > 0) {
+    const ownerSim = cosineSimilarity(ownerAlignment, tileCulture);
     let bestNeighborSim = -Infinity;
     for (const alignment of enemyNeighborAlignments) {
       const sim = cosineSimilarity(alignment, tileCulture);
       if (sim > bestNeighborSim) bestNeighborSim = sim;
     }
-    pressure = Math.round(
-      Math.max(0, bestNeighborSim - ownerSim) * config.neighborPressureStrength * 10000
-    );
+    pressure = Math.max(0, bestNeighborSim - ownerSim) * config.neighborPressureStrength;
   }
 
-  return clamp(base - pressure, -10000, 10000);
+  return { target: clamp(base - pressure, -1, 1) };
 }
 
 /**
@@ -79,7 +65,7 @@ export function calculateLoyaltyTarget(
  * Result is never outside the bounds already set by calculateLoyaltyTarget.
  */
 export function stepLoyalty(current: number, target: number, momentumRate: number): number {
-  return Math.round(current + (target - current) * momentumRate);
+  return current + (target - current) * momentumRate;
 }
 
 /**

@@ -1,10 +1,16 @@
 import { useGameStore } from '../../store/gameStore';
+import { useUIStore } from '../../store/uiStore';
 
 export function NotificationPanel() {
   const notifications       = useGameStore((state) => state.notifications);
   const dismissNotification = useGameStore((state) => state.dismissNotification);
+  const viewingPlayerId     = useUIStore((state) => state.viewingPlayerId);
 
-  if (notifications.length === 0) {
+  const visibleNotifications = notifications.filter(
+    (n) => n.playerId === viewingPlayerId || n.playerId === 'global',
+  );
+
+  if (visibleNotifications.length === 0) {
     return (
       <div
         style={{
@@ -24,7 +30,7 @@ export function NotificationPanel() {
 
   return (
     <div style={{ height: '100%', width: '100%', overflowY: 'auto' }}>
-      {notifications.map((n) => (
+      {visibleNotifications.map((n) => (
         <div
           key={n.id}
           style={{
@@ -38,7 +44,7 @@ export function NotificationPanel() {
             alignItems: 'center',
           }}
         >
-          <span style={{ flex: 1 }}>{n.text}</span>
+          <span style={{ flex: 1, color: n.severity === 'breaking' ? '#e05050' : n.severity === 'warning' ? '#d4a84b' : '#c0c8d0' }}>{n.text}</span>
           <button
             onClick={() => dismissNotification(n.id)}
             style={{

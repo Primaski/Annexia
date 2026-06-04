@@ -1,29 +1,344 @@
 [
   {
+    "id": "pol_mandatory_service",
+    "title": "Mandatory Military Service",
+    "description": "All able-bodied citizens are required to complete a term of military service. Troop numbers swell; civil liberties contract.",
+    "weight": 0.9,
+    "alignmentShift": { "militarism": 0.009, "liberty": -0.007, "progress": -0.003 },
+    "declineModifier": 0.5,
+    "approveEffect": {
+      "title": "Conscription Drive",
+      "type": "troop_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": 3,
+      "turnsRemaining": 8,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🪖",
+      "description": "The draft notice goes out. Every household sends someone."
+    },
+    "tribuneReactions": {
+      "tr_military_hawk": { "flavor": "Every generation must learn that liberty is defended, not inherited." },
+      "tr_populist": { "flavor": "The poor march to war. The wealthy find reasons to stay home." },
+      "tr_technocrat": { "flavor": "Conscript armies are statistically less effective than professional ones per unit cost." },
+      "tr_industrialist": { "flavor": "Disciplined workers make disciplined soldiers. I see no downside." }
+    }
+  },
+  {
+    "id": "pol_peace_dividend",
+    "title": "Peace Dividend",
+    "description": "Redirect military budget to civil infrastructure. Popular with progressives; alarming to security hawks.",
+    "weight": 0.85,
+    "alignmentShift": { "militarism": -0.008, "progress": 0.006, "liberty": 0.004 },
+    "declineModifier": 0.6,
+    "approveEffect": {
+      "title": "Peace Dividend",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": 15,
+      "turnsRemaining": 5,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🕊️",
+      "description": "Swords into plowshares — and plowshares into coin."
+    },
+    "tribuneReactions": {
+      "tr_military_hawk": { "flavor": "A nation that dismantles its sword will soon need to borrow one." },
+      "tr_environmentalist": { "flavor": "Funds redirected from guns to roads and clinics. A start, at least." },
+      "tr_technocrat": { "flavor": "The fiscal reallocation projections are genuinely favorable here." },
+      "tr_industrialist": { "flavor": "Defense contracts are profitable. This is not the direction I'd choose." }
+    }
+  },
+  {
+    "id": "pol_green_energy_transition",
+    "title": "Green Energy Transition",
+    "description": "Phase out fossil fuels and invest in renewable energy infrastructure. Expensive in the short term; ecologically transformative.",
+    "weight": 0.8,
+    "alignmentShift": { "ecology": 0.011, "progress": 0.005, "militarism": -0.003 },
+    "declineModifier": 0.7,
+    "approveEffect": {
+      "title": "Transition Cost",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": -8,
+      "turnsRemaining": 6,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🌱",
+      "description": "The transition is costly. The old infrastructure doesn't go quietly."
+    },
+    "tribuneReactions": {
+      "tr_environmentalist": { "flavor": "The cost of doing nothing has always exceeded the cost of acting." },
+      "tr_industrialist": { "biasOverride": -0.7, "flavor": "You're asking me to dismantle the engine of civilization on a promise." },
+      "tr_technocrat": { "flavor": "The infrastructure investment has solid long-term efficiency projections." },
+      "tr_military_hawk": { "flavor": "Energy independence is a strategic asset. I'll allow it." }
+    }
+  },
+  {
+    "id": "pol_religious_patronage",
+    "title": "State Religious Patronage",
+    "description": "Formally fund and endorse a state religious institution. Deeply meaningful to the faithful; alienating to secularists.",
+    "weight": 0.75,
+    "alignmentShift": { "religion": 0.01, "liberty": -0.005, "progress": -0.004 },
+    "declineModifier": 0.6,
+    "approveEffect": {
+      "title": "Temple Upkeep",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": -10,
+      "turnsRemaining": 4,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"⛪",
+      "description": "The temples must be maintained. The state will see to it."
+    },
+    "tribuneReactions": {
+      "tr_populist": { "flavor": "Faith is the one thing that has always been free. Don't put a price on it." },
+      "tr_technocrat": { "biasOverride": -0.6, "flavor": "State religion introduces irrational variables into governance modeling." },
+      "tr_environmentalist": { "flavor": "Many traditions carry deep ecological wisdom. I won't oppose this outright." },
+      "tr_military_hawk": { "flavor": "A people united in faith are harder to divide. There is strategic value here." }
+    }
+  },
+  {
+    "id": "pol_secular_education",
+    "title": "Secular Education Act",
+    "description": "Standardize public education around civic and scientific curricula, removing religious instruction from state schools.",
+    "weight": 0.8,
+    "alignmentShift": { "religion": -0.008, "progress": 0.007, "liberty": 0.003 },
+    "declineModifier": 0.7,
+    "tribuneReactions": {
+      "tr_technocrat": { "flavor": "Standardized empirical education is the single highest-return investment a state can make." },
+      "tr_populist": { "flavor": "You are asking parents to trust the state more than their own faith. Tread carefully." },
+      "tr_environmentalist": { "flavor": "Scientific literacy and environmental stewardship are deeply linked. Yes." },
+      "tr_military_hawk": { "flavor": "A technically educated populace produces better engineers and officers. Fine." }
+    }
+  },
+  {
+    "id": "pol_emergency_conscription",
+    "title": "Emergency Conscription",
+    "description": "A rapid but brutal expansion of the military through forced enlistment. High troop yield; severe civil cost.",
+    "weight": 0.7,
+    "alignmentShift": { "militarism": 0.007, "liberty": -0.01, "progress": -0.005 },
+    "declineModifier": 0.4,
+    "approveEffect": {
+      "title": "Emergency Conscription",
+      "type": "troop_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": 5,
+      "turnsRemaining": 3,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🪖",
+      "description": "No volunteers needed. You're all volunteering."
+    },
+    "tribuneReactions": {
+      "tr_military_hawk": { "flavor": "Desperate times. I will not pretend this is anything other than what it is." },
+      "tr_populist": { "flavor": "Chains don't stop being chains just because you call them uniforms." },
+      "tr_technocrat": { "flavor": "Short-term troop surge with severe long-term morale degradation. Use sparingly." },
+      "tr_industrialist": { "flavor": "Workers pulled from the factories cost me more than the troops are worth." }
+    }
+  },
+  {
+    "id": "pol_tax_reform",
+    "title": "Progressive Tax Reform",
+    "description": "Restructure the tax code to place greater burden on accumulated wealth. Popular with the poor; despised by elites.",
+    "weight": 0.85,
+    "alignmentShift": { "liberty": 0.005, "progress": 0.006, "religion": -0.002 },
+    "declineModifier": 0.8,
+    "approveEffect": {
+      "title": "Progressive Taxation",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": 12,
+      "turnsRemaining": 6,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"📊",
+      "description": "The wealthy discover that the law applies to them too."
+    },
+    "tribuneReactions": {
+      "tr_industrialist": { "biasOverride": -0.85, "flavor": "You are describing the redistribution of ambition." },
+      "tr_populist": { "flavor": "The people didn't ask for much. Just their fair share." },
+      "tr_technocrat": { "flavor": "The revenue modeling on this is solid. Behavioral tax elasticity may reduce yield slightly." },
+      "tr_environmentalist": { "flavor": "Wealth concentrated in few hands rarely finds its way to conservation." }
+    }
+  },
+  {
+    "id": "pol_austerity_measures",
+    "title": "Austerity Measures",
+    "description": "Slash public spending to stabilize national finances. Improves the budget dramatically; popular with no one.",
+    "weight": 0.75,
+    "alignmentShift": { "progress": -0.006, "liberty": -0.004, "ecology": -0.003 },
+    "declineModifier": 0.9,
+    "approveEffect": {
+      "title": "Austerity Measures",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": 20,
+      "turnsRemaining": 4,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"✂️",
+      "description": "The belt tightens. The treasury breathes."
+    },
+    "tribuneReactions": {
+      "tr_industrialist": { "flavor": "Fiscal discipline is the foundation of national strength. Painful but necessary." },
+      "tr_populist": { "flavor": "Tell me which services you're cutting and I'll tell you whose children pay for it." },
+      "tr_technocrat": { "flavor": "Short-term stability gain. Long-term infrastructure deficit. Acceptable if temporary." },
+      "tr_environmentalist": { "flavor": "Conservation budgets are never considered essential until they're gone." }
+    }
+  },
+  {
+    "id": "pol_free_press_act",
+    "title": "Free Press Protection Act",
+    "description": "Enshrine press freedom and prohibit state censorship. Liberties expand; state control narrows.",
+    "weight": 0.8,
+    "alignmentShift": { "liberty": 0.009, "progress": 0.004, "religion": -0.002 },
+    "declineModifier": 0.75,
+    "tribuneReactions": {
+      "tr_technocrat": { "flavor": "Information flow is a civic infrastructure. This protects it." },
+      "tr_military_hawk": { "flavor": "The enemy reads our press too. Freedom of speech has a cost in wartime." },
+      "tr_populist": { "flavor": "A free press is the only mirror powerful people are afraid to look into." },
+      "tr_industrialist": { "flavor": "A free press also investigates my books. I have reservations." }
+    }
+  },
+  {
+    "id": "pol_border_fortification",
+    "title": "Border Fortification Program",
+    "description": "Construct permanent defensive installations along national borders. Expensive and ecologically disruptive; strategically reassuring.",
+    "weight": 0.75,
+    "alignmentShift": { "militarism": 0.008, "ecology": -0.005, "liberty": -0.003 },
+    "declineModifier": 0.5,
+    "approveEffect": {
+      "title": "Fortification Cost",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": -12,
+      "turnsRemaining": 5,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🏰",
+      "description": "Stone and steel where the border used to be a suggestion."
+    },
+    "tribuneReactions": {
+      "tr_military_hawk": { "flavor": "A wall is not a strategy, but it is a very good start." },
+      "tr_environmentalist": { "flavor": "Every kilometer of wall is a migration corridor destroyed." },
+      "tr_industrialist": { "flavor": "Construction contracts. I know several excellent firms." },
+      "tr_technocrat": { "flavor": "Static defenses have poor cost-efficiency versus mobile deterrence. But they reassure citizens, which has value." }
+    }
+  },
+  {
+    "id": "pol_civic_works",
+    "title": "Civic Works Programme",
+    "description": "A major government-led investment in roads, housing, and public utilities. Costly but broadly beloved.",
+    "weight": 0.85,
+    "alignmentShift": { "progress": 0.007, "liberty": 0.003, "ecology": 0.002 },
+    "declineModifier": 0.7,
+    "approveEffect": {
+      "title": "Civic Works",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": -8,
+      "turnsRemaining": 5,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"🏗️",
+      "description": "Roads. Bridges. Housing. The state, building."
+    },
+    "tribuneReactions": {
+      "tr_populist": { "flavor": "Roads, homes, water. These are the things people actually need." },
+      "tr_technocrat": { "flavor": "The multiplier effects of public infrastructure investment are well-documented." },
+      "tr_industrialist": { "flavor": "Government-built roads are roads I didn't have to build. I'll take it." },
+      "tr_environmentalist": { "flavor": "It depends entirely on where they're building and what they're paving over." }
+    }
+  },
+  {
+    "id": "pol_surveillance_state",
+    "title": "National Surveillance Programme",
+    "description": "Deploy widespread monitoring of communications and public spaces in the name of security. Effective; deeply unpopular with libertarians.",
+    "weight": 0.7,
+    "alignmentShift": { "liberty": -0.01, "militarism": 0.005, "progress": 0.003 },
+    "declineModifier": 0.6,
+    "approveEffect": {
+      "title": "Surveillance Network",
+      "type": "budget_income",
+      "scope": "all_owned",
+      "targeting": "self",
+      "magnitude": -6,
+      "turnsRemaining": null,
+      "uses": null,
+      "enabled": true,
+      "suspendable": false,
+      "icon":"📡",
+      "description": "The cameras never blink. Neither does the state."
+    },
+    "tribuneReactions": {
+      "tr_military_hawk": { "flavor": "Intelligence is force multiplier. The discomfort of the innocent is a worthwhile cost." },
+      "tr_technocrat": { "flavor": "The data security implications alone make this difficult to recommend without significant oversight." },
+      "tr_populist": { "flavor": "They call it safety. We call it being watched." },
+      "tr_environmentalist": { "flavor": "A state that watches its citizens this closely will eventually watch dissidents too." }
+    }
+  },
+  {
     "id": "pol_coal_subsidies",
     "title": "Subsidize Coal Industry",
     "description": "Redirect government funds to domestic coal producers, boosting energy output and industrial jobs.",
     "weight": 1.0,
-    "alignmentShift": { "ecology": -0.12, "militarism": 0.04, "liberty": -0.03 },
+    "alignmentShift": { "ecology": -0.012, "militarism": 0.004, "liberty": -0.003 },
     "declineModifier": 0.6,
-    "loyaltyEffect": { "trait": "ecology", "modifier": -10 }
+    "tribuneReactions": {
+      "tr_environmentalist": { "flavor": "Burying coal ash in our children's future is not an energy policy." },
+      "tr_military_hawk":    { "biasOverride": 0.5, "flavor": "Domestic fuel keeps the war machine turning when supply lines fail." },
+      "tr_industrialist":    { "biasOverride": 0.8, "flavor": "Coal built this civilization; withdrawing its support now is the height of ingratitude." },
+      "tr_populist":         { "flavor": "It's the miners' lungs that pay the real subsidy — not the shareholders'." }
+    }
   },
   {
     "id": "pol_military_expansion",
     "title": "Expand Standing Army",
     "description": "Authorize a major increase in military personnel and equipment. Costs are significant; so is the deterrent effect.",
     "weight": 0.9,
-    "alignmentShift": { "militarism": 0.1, "liberty": -0.05, "progress": -0.04 },
+    "alignmentShift": { "militarism": 0.01, "liberty": -0.005, "progress": -0.004 },
     "declineModifier": 0.4,
-    "loyaltyEffect": { "trait": "militarism", "modifier": 10 }
+    "tribuneReactions": {
+      "tr_military_hawk":    { "flavor": "Hesitation on the border is an invitation written in blood." },
+      "tr_environmentalist": { "flavor": "Every cannon forged is a forest that will not be planted." },
+      "tr_populist":         { "flavor": "The common soldier's family does not share in the general's glory." },
+      "tr_industrialist":    { "flavor": "Secure borders are good for business — the tariff lines practically write themselves." },
+      "tr_technocrat":       { "flavor": "Projection of force has measurable deterrence value when calibrated correctly." }
+    }
   },
   {
     "id": "pol_civil_liberties_act",
     "title": "Civil Liberties Reform",
     "description": "Expand rights of assembly, speech, and religious practice. Popular with diverse populations; seen as weakness by traditionalists.",
     "weight": 0.85,
-    "alignmentShift": { "liberty": 0.1, "progress": 0.07, "religion": 0.03 },
+    "alignmentShift": { "liberty": 0.01, "progress": 0.007, "religion": 0.003 },
     "declineModifier": 0.8,
-    "loyaltyEffect": { "trait": "liberty", "modifier": 12 }
+    "tribuneReactions": {
+      "tr_environmentalist": { "flavor": "A free people are far more likely to protect what they love — including the land." },
+      "tr_military_hawk":    { "flavor": "Freedoms are luxuries that vanish the moment the enemy arrives at the gate." },
+      "tr_technocrat":       { "flavor": "Protected civil discourse tends to produce more accurate and actionable civic data." },
+      "tr_populist":         { "flavor": "Rights aren't privileges handed down from above — they belong to every person who breathes." },
+      "tr_industrialist":    { "flavor": "Too much freedom in the streets means not enough order where it counts." }
+    }
   }
 ]

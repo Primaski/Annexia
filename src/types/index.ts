@@ -21,7 +21,9 @@ export type { AxialCoord, PixelCoord };
 
 /**
  * The five traits that describe a culture or alignment.
- * Each value is a float between 0 and 1.
+ * Each value is a float between -1 and 1. Positive values represent the named
+ * trait; negative values represent its opposite (e.g. ecology=-0.8 means strong
+ * industrial/anti-environment values).
  *
  * These are not moral judgments — they're just what a population values.
  * A tile with ecology=0.9 strongly prioritizes environmental protection.
@@ -49,12 +51,8 @@ export interface Tribune {
   name: string;         // Display name: "Dr. Mara Voss"
   archetype: string;    // e.g. "environmentalist" — used for grouping / flavor
   traitWeights: TraitVector; // What this tribune values; drives their policy biases
-  /**
-   * Per-policy stances. Keys are policy IDs from policies.json. Unlisted policies = neutral (bias 0).
-   * bias: -1.0 (strongly oppose) to 1.0 (strongly endorse).
-   * flavor: one sentence of in-character reaction to this policy.
-   */
-  policyStances: Record<string, { bias: number; flavor: string }>;
+  agreeText: string;         // Fallback flavor shown when the tribune supports a choice
+  disagreeText: string;      // Fallback flavor shown when the tribune opposes a choice
   flavourText: string;       // Short quote displayed in the tribune panel
   imagePath: string | null;  // Path to portrait image; null until Phase 4
 }
@@ -68,20 +66,6 @@ export interface Advisor {
 
 // ─── JSON Data Types (policies.json) ─────────────────────────────────────────
 
-/**
- * The loyalty effect of a policy approval.
- * `trait` — which culture trait determines how strongly a tile reacts.
- * `modifier` — loyalty delta (in display units) applied to the most extreme tile on this trait.
- *   Positive = loyalty gain. Negative = loyalty loss.
- *   Scaled by how far the tile's trait value is from 0.5 (neutral).
- *   A tile at 0.5 is unaffected. A tile at 1.0 or 0.0 gets the full modifier.
- * On decline, the effect is negated and scaled by declineModifier.
- */
-export interface LoyaltyEffect {
-  trait: keyof TraitVector;
-  modifier: number;
-}
-
 /** One policy card from policies.json. */
 export interface Policy {
   id: string;
@@ -90,9 +74,9 @@ export interface Policy {
   weight?: number;          // Default 1.0 if absent
   alignmentShift: Partial<TraitVector>; // Approve direction. Decline negates × declineModifier.
   declineModifier?: number; // Default 1.0 if absent. Scales both alignment and loyalty on decline.
-  loyaltyEffect: LoyaltyEffect;
   approveEffect?: Omit<ActiveEffect, 'id' | 'sourcePlayerId' | 'targetPlayerIds'>;
   declineEffect?: Omit<ActiveEffect, 'id' | 'sourcePlayerId' | 'targetPlayerIds'>;
+  tribuneReactions?: Record<string, { flavor?: string; biasOverride?: number }>;
 }
 
 // ─── JSON Data Types (events.json) ───────────────────────────────────────────
@@ -194,13 +178,23 @@ export type WaterTile = BaseTile & { state: 'water' };
 export type UnclaimedTile = LandTile & { state: 'unclaimed' };
 
 /**
- * Barbarian-controlled land. Has a defense value set at generation.
- * Can be claimed via Invade. Defense does not regenerate.
+ * Barbarian-controlled land. Troop count is assigned at generation based on
+ * the nation cluster's average militarism. Can be claimed via Invade.
  */
 export type BarbarianTile = LandTile & {
   state: 'barbarian';
-  defense: number; // 0–100. Randomly assigned at generation (20–60).
+  activeTroops: number;       // Assigned at generation. Scales with cluster militarism.
+  previousOwner: string | null; // Player ID of last owner before becoming barbarian; null if always barbarian.
 };
+
+export interface LoyaltyLogEntry {
+  label: string;  // Human-readable source, e.g. "Policy: Mandatory Military Service", "Drift", "Enemy neighbor pressure"
+  delta: number;  // Signed float in loyalty units [-1, 1]. Negative = bad.
+}
+
+export const CONQUEST_LOYALTY_UNCLAIMED = 0.30;   // Annexing an unclaimed tile
+export const CONQUEST_LOYALTY_BARBARIAN = -0.30;  // Invading a barbarian tile
+export const CONQUEST_LOYALTY_RECLAIMED = -0.50;  // Re-annexing a tile that seceded from you
 
 /**
  * Player-owned land. Carries the full loyalty and suppression state.
@@ -210,11 +204,12 @@ export type BarbarianTile = LandTile & {
 export type OwnedTile = LandTile & {
   state: 'owned';
   ownerId: string;       // References Player.id
-  loyalty: number;       // Internal units [-10000, +10000]. Divide by LOYALTY_SCALE for display.
-  loyaltyTarget: number; // Internal units [-10000, +10000]. Divide by LOYALTY_SCALE for display.
+  loyalty: number;       // Float in [-1, 1].
+  loyaltyTarget: number; // Float in [-1, 1].
   activeTroops: number;  // Per-tile troop count. [0, MAX]. Starts at 10 on spawn tile, 0 on all other owned tiles.
   suppression: number;   // 0–100. Slows loyalty decay; builds hidden resentment.
   defense: number;       // 0–100. Starts at 0 (from unclaimed) or inherited (from barbarian).
+  loyaltyLog: LoyaltyLogEntry[];
 };
 
 /**
@@ -239,6 +234,8 @@ export interface ActiveEffect {
   turnsRemaining: number | null; // null = permanent
   uses: number | null;           // null = unlimited. 1 = consumed on first trigger.
   enabled: boolean;              // false = effect exists but is currently inactive. Shown faded in UI.
+  suspendable: boolean;          // If true, this effect can be disabled by low average loyalty. Starter effects only.
+  title: string;
   icon: string;
   description: string;
 }
@@ -269,9 +266,16 @@ export interface Player {
 
 // ─── Notifications ────────────────────────────────────────────────────────────
 
+/**
+ * A notification displayed in the notification feed.
+ * playerId scopes the notification: 'global' for world events visible to all
+ * players (e.g. breakaways), or a player's id string for player-scoped events.
+ */
 export interface Notification {
   id: string;
   text: string;
+  severity: 'info' | 'warning' | 'breaking';
+  playerId: string; // 'global' for world events; player id for player-scoped events
 }
 
 // ─── Turn / Phase State ───────────────────────────────────────────────────────

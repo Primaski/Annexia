@@ -39,62 +39,105 @@ engine/ (pure TS) → hooks/ (bridge) → store/ (state) → components/ (render
 src/
   data/                     ← JSON content files. Content, not code.
     advisors.json            ← Impartial advisor(s). imagePath populated.
-    tribunes.json            ← Political tribunes. policyStances + traitWeights.
+    tribunes.json            ← Political tribunes. traitWeights, agreeText, disagreeText.
     ai_personalities.json    ← AI archetypes. traitVector + aggression + noise.
-    policies.json            ← Policy cards. choices, alignmentShift, loyaltyEffect.
+    policies.json            ← Policy cards. alignmentShift, optional effects,
+                                optional tribuneReactions (flavor + biasOverride per tribune).
     events.json              ← Random events. Not yet wired to engine.
 
   engine/                   ← Pure TypeScript. No React. No Zustand.
     hex.ts                   ← Coordinate math, pixel conversion, neighbors, grid gen
-    loyalty.ts               ← cosineSimilarity, calculateLoyaltyTarget, stepLoyalty,
-                                isBreakawayCandidate, SPAWN_LOYALTY
+    loyalty.ts               ← cosineSimilarity, calculateLoyaltyTarget (returns { target }),
+                                stepLoyalty, isBreakawayCandidate, SPAWN_LOYALTY
     mapGen.ts                ← Voronoi + noise land/water, culture vectors, barbarian
-                                clusters, nation flood-fill. Returns MapGenResult.
+                                clusters (with militarism-scaled troop assignment),
+                                nation flood-fill. Returns MapGenResult.
     names.ts                 ← generateName(rand). 80-syllable bank. Seeded, pure.
     policy.ts                ← drawPolicyCards, computeSentimentShifts,
                                 computeVetoProbability, resolvePolicyVeto,
-                                applyPolicyChoice
+                                applyPolicyChoice (owner-scoped loyalty only),
+                                chooseAIPolicyOption
     spawnPlayers.ts          ← Starting territory placement, overlap assertion
-    mobilization.ts          ← (next) getAnnexableTiles, annexTile, future actions
+    mobilization.ts          ← getAnnexableTiles, annexTile, fortifyTile,
+                                getTotalAvailableTroops, getInvadableTileKeys,
+                                invadeTile, simulateCombat (Lanchester), CombatResult
 
   store/
     gameStore.ts             ← All game session state. Tiles, players, nations,
                                 tribunes, phase, turn, activePolicyCards, effects.
+                                relocatedTroops entries carry actionType: 'passive' | 'military'.
+                                spendAction(amount?) accepts optional flat amount.
     uiStore.ts               ← UI-only state. selectedTile, hoveredTile, tooltip
-                                position, activeOverlay, vetoResult.
+                                position, activeOverlay, vetoResult, policyHoverChoice,
+                                viewingPlayerId, invadeModeActive, setInvadeModeActive.
 
   hooks/
     useGame.ts               ← Bridge between engine and store.
                                 useMapGen, resolveTurn, processAITurns,
                                 startPolicyPhase, submitPolicyChoice,
                                 finishPolicyPhase, endMobilizationPhase,
-                                performAnnex (next)
+                                performAnnex, performFortify, performInvade,
+                                getInvadableTileKeysForPlayer,
+                                getMilitarySpentByTile (exported helper),
+                                getReceivedPassiveByTile (exported helper),
+                                RelocationEntry (exported type)
     useMapLayout.ts          ← hexToPixel wrapper, stable callback
 
   components/
     map/
       HexGrid.tsx            ← SVG container. ResizeObserver sizing. Mouse event
-                                wiring. Territory border edges. No game logic.
+                                wiring. Territory border edges. Pan and zoom via
+                                CSS transform on inner wrapper div. No game logic.
+                                isDraftSource respects invadeModeActive — when invading,
+                                only tiles adjacent to selectedTileCoord are highlighted.
       HexTile.tsx            ← Individual hex polygon. Fill color by state/overlay.
+                                Loyalty preview overlay on policy hover.
+                                Barbarian tiles color-scaled by activeTroops.
       MapFilters.tsx         ← Overlay toggle buttons. Default + traits + loyalty.
     ui/
       ActionBar.tsx          ← Phase router. Renders one panel component per phase.
       HoverTooltip.tsx       ← Mouse-tracked tooltip. Fixed position. No delay.
                                 pointer-events none.
-      TileDetailPanel.tsx    ← Floating top-right of map. Click to open. × to close.
+      TileDetailPanel.tsx    ← Floating top-right of map. Policy phase only — returns
+                                null during mobilization. Drag handle: sprite + nation
+                                name + coords + × button. Renders TileDetailContent
+                                below the header.
+      TileDetailContent.tsx  ← Extracted tile detail body. Used by both TileDetailPanel
+                                (policy phase) and MobilizationPanel (mobilization phase).
+                                Contains all mode state (draftMode, fortifyMode, invadeMode),
+                                draft useEffects, computed troop availability, and all
+                                action buttons (Annex, Fortify, Invade + draft panels).
+                                Resets cleanly on tileKey change and unmount.
+                                Subtracts receivedPassiveByTile in military eligibility checks.
+                                Confirm handlers do NOT call selectTile(null) — tile stays
+                                selected after action.
       NotificationBubbles.tsx ← Export: NotificationPanel. Vertical list in notif bar.
+                                Severity-colored text. Filters to viewingPlayerId + 'global'.
       Sprite.tsx             ← Image or lettered placeholder. Reusable.
       MapTuningPanel.tsx     ← Dev tool for map config sliders.
+      EffectsBar.tsx         ← Floating top-left of map. Active effect icons + tooltips.
+                                Groups same-title effects; shows count badge when >1.
+      CardTooltip.tsx        ← Shared card tooltip. Exports: CardTooltipContent,
+                                effectTypeImage, formatMechanical, CardTooltipEffect type.
       phases/
         RoundtablePanel.tsx  ← Game start setup: name, government, tribunes, advisor.
         PolicyPanel.tsx      ← Policy card + inline veto screen.
         CalibrationPanel.tsx ← "Resolving turn..." placeholder.
-        MobilizationPanel.tsx ← Actions remaining + End Turn.
+        MobilizationPanel.tsx ← Three-zone layout: persistent header (label + AP count),
+                                scrollable body (TileDetailContent when tile selected,
+                                hint text otherwise), End Turn pinned at bottom.
 
   types/
     index.ts                 ← All shared interfaces. Single import source.
+                                LoyaltyLogEntry: { label: string; delta: number }
+                                CONQUEST_LOYALTY_UNCLAIMED (+0.30), CONQUEST_LOYALTY_BARBARIAN (-0.30),
+                                CONQUEST_LOYALTY_RECLAIMED (-0.50) exported constants.
+                                BarbarianTile carries previousOwner: string | null.
 
   config.ts                  ← TuningConfig + DEFAULT_CONFIG. Engine constants only.
+                                combat.lanchesterExponent (default 3) — army-size scaling factor.
+                                combat.defenderBonus (default 1.07) — structural defender advantage;
+                                intentionally exposed for future card effects.
   App.tsx                    ← Layout shell + phase-driven useEffect hooks.
   main.tsx                   ← Vite entry point.
 ```
@@ -107,14 +150,15 @@ Five named regions. Names are canonical — use them in all future discussions.
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
-│ INFO BAR (36px, full width)                                     │
-│ Turn N — Phase                              troops: N   AP: N  │
+│ INFO BAR (40px, full width)                                     │
+│ Turn N — Phase                    troops: N   AP: N   💰 N     │
 ├──────────────┬──────────────────────────────────────────┬───────┤
 │              │ [EFFECTS BAR - floating, top-left map]   │       │
 │ NOTIFICATION │                                          │ACTION │
-│ BAR (200px)  │         MAP AREA (flex 1)                │ BAR   │
-│              │         position: relative               │(420px)│
-│              │                       [TILE DETAIL PANEL]│       │
+│ BAR          │         MAP AREA (flex 1)                │ BAR   │
+│ (200px,      │         position: relative               │(420px,│
+│  min 200px)  │         overflow: hidden                 │ min   │
+│              │  [TILE DETAIL PANEL — policy phase only] │ 210px)│
 │              │                        floating top-right│       │
 └──────────────┴──────────────────────────────────────────┴───────┘
 │ SETTINGS BAR (40px, full width)                                 │
@@ -123,227 +167,141 @@ Five named regions. Names are canonical — use them in all future discussions.
 
 ### Info Bar
 - Turn number + phase name (left)
-- Total troops (sum of activeTroops across owned tiles) + action points available (right)
+- Total troops + available troops + AP + budget (right)
 - Reads directly from gameStore in App.tsx
 
 ### Notification Bar
 - Vertical list of dismissable text notifications
-- Empty state: "no notifications" muted
-- 200px wide, full remaining height
+- 200px wide, full remaining height, minimum 200px (flex-shrink: 1)
+- Notifications have `severity: 'info' | 'warning' | 'breaking'`
+- Notifications have `playerId: string` — `'global'` for world events, player id for player-scoped
+- Display layer filters to `viewingPlayerId` (from uiStore) or `'global'`
 
 ### Map Area
 - `position: relative` — required for floating panels anchored inside it
-- HexGrid fills via ResizeObserver, never via window.innerWidth
-- **Effects bar**: `position: absolute, top: 12px, left: 12px` — hoverable effect icons
-- **Tile detail panel**: `position: absolute, top: 12px, right: 12px` — appears on tile click
+- `overflow: hidden` — prevents zoomed/panned SVG from bleeding into adjacent panels
+- `zIndex: 0` — side panels sit above it at zIndex 2
+- Tile detail panel floats here during policy phase only. Suppressed during mobilization.
 
 ### Action Bar
-- 420px wide, full remaining height
-- Context-sensitive by phase:
-  - `roundtable` → RoundtablePanel
-  - `policy` → PolicyPanel
-  - `calibration` → CalibrationPanel
-  - `mobilization` → MobilizationPanel
+- 420px wide, minimum 210px (flex-shrink: 1)
+- Routes to phase panel components: RoundtablePanel / PolicyPanel / CalibrationPanel / MobilizationPanel
+- During mobilization: shows TileDetailContent inline when a tile is selected; End Turn always pinned at bottom
 
 ### Settings Bar
 - 40px, full width
-- Lens button (toggles MapFilters panel floating above it)
-- Future: additional settings
+- Map overlay toggles (default / trait overlays / loyalty overlay)
 
 ---
 
-## Hover and Click Interaction Model
+## Tile Data Model
 
-**Hover (HoverTooltip)**
-- Fires immediately on mouseenter, dismisses on mouseleave
-- No delay
-- Fixed position, offset 12px from cursor
-- pointer-events: none (never blocks clicks)
-- Shows: tile name, owner, loyalty/defense where applicable, trait emojis for extremes
-
-**Click (TileDetailPanel)**
-- Opens floating panel at top-right of map area
-- Shows full tile detail
-- During mobilization: will also show available action buttons (next task)
-- × button closes it
-- Water tiles: panel does not open
-
-**Tile interaction during mobilization**
-- Hover: shows basic info + available actions as text
-- Click: opens detail panel with action buttons
-- If tile is annexable: highlight color on map, action button in detail panel
-
----
-
-## Coordinate System
-
-Axial coordinates throughout. `{ q, r }`. Never store cube coords (s = -q - r is derived).
-
-Key functions in `hex.ts`:
-- `coordKey({ q, r })` → `"q,r"` string — used as Record key everywhere
-- `hexNeighbors(coord)` → 6 neighbors, no bounds check
-- `isInGrid(coord, cols, rows)` → bounds check
-- `hexDistance(a, b)` → step count
-- `hexToPixel(coord, size)` → pixel center for SVG rendering
-- `hexCorners(center, size)` → 6 corner points for polygon
-
-Grid generation: `generateGridCoords(cols, rows)` — offset rows, row-major order.
-
----
-
-## State Architecture
-
-### What Lives Where
-
-**gameStore** — "what is true about the game world"
-- `tiles: Record<string, Tile>` — keyed by coordKey
-- `players: Player[]` — index 0 is always human
-- `nations: Record<string, Nation>`
-- `tribunes: Tribune[]` — full roster, loaded once at start
-- `phase: TurnPhase`
-- `currentTurn: number`
-- `activePolicyCards: Policy[]`
-- `currentPolicyCardIndex: number`
-- `actionsRemaining: number`
-- `notifications: Notification[]`
-- `pendingRoundtable: boolean`
-- `roundtableReason: RoundtableReason | null`
-- `mapSeed: number | null`
-- `winnerId: string | null`
-
-**uiStore** — "what is the player looking at"
-- `selectedTileCoord: AxialCoord | null`
-- `hoveredTileCoord: AxialCoord | null`
-- `tooltipPosition: { x, y }`
-- `activeOverlay: { trait, inverted } | null`
-- `vetoResult: { policyId, tribuneId, originalChoiceIndex, finalChoiceIndex } | null`
-
-### What Never Lives in the Store
-- Derived/computed values — calculate in components or hooks
-- Engine intermediate results — return from pure functions, pass to store actions
-
----
-
-## Type System
-
-All shared interfaces in `src/types/index.ts`. Single import source for everything.
-
-### Key Types
-
-**Tile union** — `WaterTile | UnclaimedTile | BarbarianTile | OwnedTile`
-Always narrow before accessing state-specific fields: `if (tile.state === 'owned') { ... }`
-
-**TraitVector** — five traits, all [0, 1]:
-`ecology, militarism, religion, liberty, progress`
-
-**Player**
 ```ts
-{
-  id, name, isHuman, alignmentVector: TraitVector,
-  confidence, governmentType, tribuneIds, advisorId,
-  personalityId, nationId, imagePath,
-  tribuneSentiment: Record<string, number>,  // tribune ID → [-1, 1]
-  activeEffects: ActiveEffect[]
-}
+WaterTile     = { coord, state: 'water' }
+UnclaimedTile = { coord, state: 'unclaimed', cultureVector, name, nationId }
+BarbarianTile = { coord, state: 'barbarian', cultureVector, name, nationId,
+                  activeTroops, previousOwner: string | null }
+                  // previousOwner: set when tile secedes from a player.
+                  // Used to apply CONQUEST_LOYALTY_RECLAIMED on re-invasion.
+OwnedTile     = { coord, state: 'owned', cultureVector, name, nationId,
+                  ownerId, loyalty, loyaltyTarget, activeTroops,
+                  suppression, defense,
+                  loyaltyLog: LoyaltyLogEntry[] }
+
+LoyaltyLogEntry = { label: string, delta: number }
 ```
 
-**Tribune**
-```ts
-{
-  id, name, archetype, traitWeights: TraitVector,
-  policyStances: Record<string, { bias: number; flavor: string }>,
-  flavourText, imagePath
-}
-```
+**OwnedTile.defense** — reserved for future Reinforce action. Currently unused.
 
-**ActiveEffect**
-```ts
-{
-  id, sourcePlayerId,
-  targetPlayerIds: string[],   // always array
-  type: string,                // enum later
-  scope, magnitude,
-  turnsRemaining: number | null,  // null = permanent
-  icon, description
-}
-```
+---
 
-**TurnPhase** — `'roundtable' | 'policy' | 'calibration' | 'mobilization'`
+## Troop Action Model
 
-**GovernmentType** — `'none' | 'democracy' | 'hybrid' | 'autocracy'`
+Troops follow a passive/military action rule within each turn:
+
+- **Passive action** (fortify source): recorded as `actionType: 'passive'` in `relocatedTroops`. Source tile troops are `spentTroopsByTile` — cannot be moved again. Destination tile troops are `receivedPassiveByTile` — cannot perform military actions this turn.
+- **Military action** (annex, invade): recorded as `actionType: 'military'`. Source tile troops fully locked via `spentTroopsByTile`.
+- Passive → passive re-movement is allowed (fortified troops can be fortified onward, at AP cost).
+- Passive → military is blocked (`receivedPassiveByTile` subtracted from military eligibility checks).
+- Military → anything is blocked (`spentTroopsByTile` covers this).
+
+Two exported helpers in `useGame.ts`:
+- `getMilitarySpentByTile(relocatedTroops)` — keyed by `fromKey`, military entries only
+- `getReceivedPassiveByTile(relocatedTroops)` — keyed by `toKey`, passive entries only
 
 ---
 
 ## Loyalty System
 
-Internal range: `[-10000, +10000]`. Display: divide by `LOYALTY_SCALE` (100).
+### Engine (`engine/loyalty.ts`)
+- `calculateLoyaltyTarget(ownerAlignment, tileCulture, enemyNeighborAlignments, config)` — returns `{ target: number }`.
+- `stepLoyalty(current, target, momentumRate)` — advances loyalty one tick toward target.
+- `isBreakawayCandidate(loyalty, threshold)` — true when loyalty ≤ threshold.
+- `cosineSimilarity(a, b)` — cosine similarity over five trait dimensions.
 
-**Loyalty target formula** (MAD-based):
-```
-mad = average(|ownerAlignment[trait] - tileCulture[trait]|) across 5 traits
-base = round((1 - mad × 2) × 10000)
-pressure = round(max(0, bestEnemySim - ownerSim) × neighborPressureStrength × 10000)
-target = clamp(base - pressure, -10000, +10000)
-```
+### Hook (`hooks/useGame.ts`)
+1. `startPolicyPhase()` — clears all `loyaltyLog: []` on owned tiles
+2. `submitPolicyChoice()` — appends `Policy: <title>` entries to tiles whose loyalty changed
+3. `resolveTurn()` Step 2 — builds `turnLog`, stores on tile. Preserved through mobilization for inspection.
 
-**Momentum**: `stepLoyalty(current, target, momentumRate)` — moves by `momentumRate` fraction of gap each turn.
-
-**Breakaway**: fires when loyalty ≤ `breakawayThreshold` (default -1 internal). Tile becomes BarbarianTile, inherits adjacent nation or mints new one.
-
-Tunable in `DEFAULT_CONFIG.loyalty`: `neighborPressureStrength`, `breakawayThreshold`, `momentumRate`.
+### Policy loyalty scope
+`applyPolicyChoice` only applies loyalty deltas to tiles owned by `player.id`. AI tiles unaffected by human policy decisions and vice versa.
 
 ---
 
-## Policy System
+## Combat Model (Lanchester's Square Law)
 
-**Draw**: weighted random without replacement. `policy.weight` defaults to `1.0` if absent. Tribune boost: if any council tribune has |bias| > 0.5 for this policy, multiply weight by 1.5 per matching tribune.
+Replaces the prior round-by-round simulation. Two-step resolution:
 
-**Convention**: choice index 0 = approve, index 1 = decline. Always. Labels are hardcoded in the UI — not stored in policy data.
+**Step 1 — Win probability:**
+```
+effectiveDefenders = defenders × defenderBonus
+P(attacker wins) = 1 / (1 + (effectiveDefenders / attackers) ^ lanchesterExponent)
+```
+Winner determined by `rand() < P`.
 
-**Data structure** (`data/policies.json`):
-```json
-{
-  "id": "pol_example",
-  "title": "...",
-  "description": "...",
-  "weight": 1.0,
-  "alignmentShift": { "militarism": 0.1, "liberty": -0.05 },
-  "declineModifier": 0.4,
-  "loyaltyEffect": { "trait": "militarism", "modifier": -10 }
-}
+**Step 2 — Survivors:**
 ```
-`weight` and `declineModifier` are optional — both default to `1.0` if absent.
-`alignmentShift` is the approve direction. Decline negates each shift × `declineModifier`.
-`loyaltyEffect.modifier` is the approve value. Decline negates it × `declineModifier`.
+rawSurvivors = sqrt(winner² - loser²)
+survivors = max(1, round(rawSurvivors × (0.85 + rand() × 0.3)))  // ±15% noise, floor 1
+```
 
-**Loyalty formula**:
-```
-offset = cultureVector[trait] - 0.5          // range [-0.5, +0.5]
-normalized = offset / 0.5                     // range [-1, +1]
-delta = round(appliedModifier × normalized × LOYALTY_SCALE)
-```
-Tiles at 0.5 on the trait are completely unaffected. Tiles at 0.0 or 1.0 receive the full modifier. `appliedModifier` is `modifier` on approve, `-modifier × declineModifier` on decline.
+Config knobs (`TuningConfig.combat`):
+- `lanchesterExponent: 3` — steepness of army-size advantage
+- `defenderBonus: 1.07` — structural defender edge; intentionally exposed for card effects
 
-**Resolution sequence per card**:
-1. `resolvePolicyVeto` (uses pre-shift sentiment) → finalChoiceIndex, vetoingTribuneId
-2. `computeSentimentShifts` (original choice) → updated tribuneSentiment for ALL council tribunes
-3. `applyPolicyChoice` (final choice) → updated player alignment + tile loyalty
+`defenderBonus` is designed to be overridden by active effects (e.g. a "Fortified Borders" card could increase it for specific tiles). At defaults: 13v13 ≈ 45%, 5v18 ≈ 1.7%.
 
-**Veto probability**:
-```
-base_prob = vetoCeiling[governmentType] × |bias|
-sentiment_discount = (vetoCeiling / 2) × ((sentiment + 1) / 2)
-veto_prob = max(0, base_prob - sentiment_discount)
-```
-Only highest |bias| eligible tribune rolls. One roll per policy.
+The same formula is used for both the live probability display (UI) and the actual simulation resolution — no divergence between what the player sees and what the engine computes.
 
-**Sentiment shift**:
-```
-alignment = (bias > 0 && choiceIndex === 0) || (bias < 0 && choiceIndex === 1) ? +1 : -1
-shift = alignment × |bias| × tribuneSentimentShift (default 0.15)
-newSentiment = clamp(current + shift, -1, 1)
-```
-Applied to ALL council tribunes, including those with bias = 0 (no shift for zero bias).
+---
+
+## Mobilization Actions
+
+AP costs are flat per action type. Troop counts are flexible (subject to minimums).
+
+**Annex**
+- Claim an adjacent unclaimed tile. Costs `annexAPCost` (5) AP. Minimum `annexTroopMin` (1) troop.
+- Troops must come from a connected owned region adjacent to the target.
+- Target tile spawns with `SPAWN_LOYALTY` and the exact troops committed.
+- Engine: `annexTile()`. Hook: `performAnnex()`.
+
+**Fortify**
+- Move troops from one or more owned tiles into a target owned tile.
+- Costs `fortifyAPCost` (1) AP flat, regardless of troop count or source tile count.
+- Sources and target must be in the same connected owned region.
+- Engine: `fortifyTile()`. Hook: `performFortify()`.
+
+**Invade**
+- Attack an adjacent barbarian tile. Costs `invadeAPCost` (10) AP. Minimum `invadeTroopMin` (5) troops.
+- Sources must be **directly adjacent** to the target.
+- Only militarily-eligible troops can be drafted (excludes `spentTroopsByTile` and `receivedPassiveByTile`).
+- During draft, only adjacent tiles are highlighted (not all owned tiles with troops).
+- Attacker win: survivors occupy tile with `CONQUEST_LOYALTY_BARBARIAN` (-0.30), or `CONQUEST_LOYALTY_RECLAIMED` (-0.50) if `previousOwner === player.id`.
+- Defender win: attacking troops destroyed, barbarian tile retains survivors.
+- Engine: `invadeTile()`, `simulateCombat()`. Hook: `performInvade()`.
+
+**Planned actions**: Invade player tile, Suppress, Reinforce, Propaganda campaign, Barter.
 
 ---
 
@@ -351,67 +309,99 @@ Applied to ALL council tribunes, including those with bias = 0 (no shift for zer
 
 ```
 [turn N start]
+  startPolicyPhase():
+    → clear all loyaltyLog: [] on owned tiles
+    → drawPolicyCards(3), store in activePolicyCards
+
   if pendingRoundtable === true
-    → phase: 'roundtable' (RoundtablePanel in action bar)
+    → phase: 'roundtable'
     → player confirms name / government / tribunes
     → setPhase('policy'), setPendingRoundtable(null)
 
   phase: 'policy'
-    → startPolicyPhase(): drawPolicyCards(3), store in activePolicyCards
     → for each card:
         submitPolicyChoice(choiceIndex)
-          → resolvePolicyVeto (pre-shift sentiment)
-          → computeSentimentShifts (original choice) → updatePlayer
-          → applyPolicyChoice (final choice) → setTiles, updatePlayer
-          → if veto: set vetoResult in uiStore → show veto screen
-          → else: advance card or call finishPolicyPhase()
+          → resolvePolicyVeto → computeSentimentShifts → applyPolicyChoice
+          → if veto: show veto screen
+          → else: advance card or finishPolicyPhase()
     → finishPolicyPhase()
-        → setPhase('calibration')
         → resolveTurn()
-            Step 1-3: loyalty targets, step loyalty, breakaway pass → setTiles
-            Step 5: tick active effects → updatePlayer per changed player
-        → read phase from store
-        → if phase !== 'roundtable': setPhase('mobilization')
-        → processAITurns() (stub)
+            Step 2: loyalty targets, step loyalty, Drift log entry
+            Step 3: breakaway pass
+            Step 3.5: effect income tick (troop + budget)
+            Step 4: setTiles
+            Step 5: tick active effects
+        → setPhase('mobilization')
 
   phase: 'mobilization'
-    → player takes actions (annex, etc.) via MobilizationPanel / tile clicks
-    → each action: spend 1 AP via spendAction()
-    → endMobilizationPhase() on End Turn button
+    → player clicks tiles; TileDetailContent renders in MobilizationPanel
+    → actions: annex, fortify, invade via TileDetailContent buttons
+    → each action: flat AP deduction via spendAction(amount)
+    → endMobilizationPhase() on End Turn
         → advanceTurn() → currentTurn++, reset submittedPlayerIds,
-                           actionsRemaining = 0,
-                           phase = pendingRoundtable ? 'roundtable' : 'policy'
+                           actionsRemaining = 0, relocatedTroops [], spentTroopsByTile {}
 
 [turn N+1 start]
 ```
 
 ---
 
-## Active Effects
+## Data Isolation and Security Model
 
-Effects live in `Player.activeEffects[]`. Ticked in calibration (resolveTurn Step 5).
+### Current (single-player vs AI)
+All data lives in a single Zustand store. `viewingPlayerId` in `uiStore` determines which player's data the UI renders. Enemy tile loyalty is hidden (`hasLoyaltyIntel = false`). Enemy troop counts visible during playtesting.
 
-**Tick behavior**: decrement `turnsRemaining` by 1. Remove if reaches 0. Skip if `turnsRemaining === null` (permanent).
+`[DEBUG]` prefix: all AI-state console logs use this for easy removal (`grep -r '\[DEBUG\]'`).
 
-**Application**: mobilization engine reads relevant effects when calculating action costs. Not yet implemented — add when mobilization actions are built.
+### Future (Firebase multiplayer)
+- Firestore security rules prevent cross-player data reads
+- Cloud Functions project only what each client is entitled to see
+- `viewingPlayerId` / `hasLoyaltyIntel` architecture slots cleanly into this model
 
-**Scope values**: `'all_owned' | 'border_tiles' | 'global' | 'specific_player'`
+---
 
-**targetPlayerIds**: always an array. Self-effect: `[player.id]`. Global: all player IDs. Cross-player: opponent's ID(s).
+## Barbarian System
+
+Barbarians are reactive bots, not players.
+- No policy phase participation, no expansion
+- `activeTroops` on every tile (militarism-scaled at generation)
+- `previousOwner: string | null` — set on secession, used for `CONQUEST_LOYALTY_RECLAIMED`
+- Tile color reflects garrison strength
+
+**Tabled mechanics**: reactive troop redistribution, barter/Buy Tile action.
+
+---
+
+## Active Effects Architecture
+
+```ts
+ActiveEffect {
+  id, sourcePlayerId, targetPlayerIds,
+  type: string,           // 'troop_income', 'budget_income', etc.
+  scope, targeting,       // targeting: 'self' | 'all_opponents' | 'global'
+  magnitude, turnsRemaining, uses,
+  enabled: boolean,       // false = suspended, shown faded in effects bar
+  suspendable: boolean,
+  title, icon, description
+}
+```
+
+**Starter effects**: seeded on every player at game start.
+**Effect income tick**: runs in `resolveTurn` Step 3.5.
+**Known limitation**: `applyPolicyChoice` resolves `'all_opponents'` and `'global'` as placeholders. Add `players: Player[]` when cross-player effects are needed.
+
+**Design note**: `defenderBonus` in `TuningConfig.combat` is intentionally exposed so future card effects can modify it per-tile or per-player.
 
 ---
 
 ## Renderer Separation Rule
 
-The SVG layer and the UI layer must stay cleanly separated at all times.
+SVG layer and UI layer must stay cleanly separated.
+- **HexGrid / HexTile**: SVG only. No UI elements inside SVG.
+- **All UI**: React divs outside SVG.
+- Mouse events on SVG write to uiStore. UI components read from uiStore.
 
-- **HexGrid** and **HexTile** render SVG only. They receive data from the store and render polygons. No UI elements (tooltips, panels, buttons) go inside the SVG.
-- **All UI** (tooltips, panels, overlays, bars) is React divs outside the SVG.
-- Mouse events on SVG elements write to uiStore (hoveredTileCoord, selectedTileCoord). React UI components read from uiStore and render independently.
-
-This separation is intentional for a future 3D or canvas pivot. If the SVG renderer is ever replaced, the entire UI layer survives unchanged because it reads from the store, not from the SVG.
-
-**Do not violate this rule.** If you find a reason to put a React component inside the SVG, it's a sign the architecture needs a different solution.
+Do not violate this rule. If you find a reason to put a React component inside the SVG, the architecture needs a different solution.
 
 ---
 
@@ -421,12 +411,10 @@ This separation is intentional for a future 3D or canvas pivot. If the SVG rende
 |---|---|
 | Coord key | `"q,r"` string, produced by `coordKey()` |
 | Player ID | `"player_1"`, `"player_2"`, etc. |
-| AI player ID | same as human, `"player_2"` onward |
-| Nation ID | `"nation_player_0"`, `"nation_0"`, `"nation_1"`, etc. |
-| Tribune ID | `"tr_environmentalist"`, `"tr_military_hawk"`, etc. |
-| Policy ID | `"pol_coal_subsidies"`, `"pol_military_expansion"`, etc. |
-| Event ID | `"evt_separatist_movement"`, etc. |
-| Effect ID | `"eff_"` prefix + descriptive name (future) |
+| Nation ID | `"nation_player_0"`, `"nation_0"`, etc. |
+| Tribune ID | `"tr_environmentalist"`, etc. |
+| Policy ID | `"pol_coal_subsidies"`, etc. |
+| Effect ID | `"eff_"` prefix + name + `"_"` + player ID for starter effects |
 | Phase | lowercase: `'policy'`, `'mobilization'`, etc. |
 | Bars/panels | info bar, notification bar, action bar, settings bar, effects bar, tile detail panel |
 
@@ -435,16 +423,24 @@ This separation is intentional for a future 3D or canvas pivot. If the SVG rende
 ## Things Intentionally Deferred
 
 - Multiplayer (Phase 5, Firebase)
-- AI mobilization behavior (stub only)
+- AI mobilization beyond basic annex
 - Confidence score mechanics
 - Tribune veto probability tuning (0.15 shift is placeholder)
 - Roundtable trigger conditions beyond game_start
-- Barbarian affinities
-- Economy / resource system beyond action points
+- Roundtable warnings for suspended effects and approaching secession
+- Barbarian reactive troop redistribution
+- Invade player-owned tiles (barbarian invasion done; PvP deferred)
+- Barbarian barter (Buy Tile action)
+- Foreign neighbor drain (flat drain formula; baseForeignPressure config knob)
+- Budget spending mechanics
 - Tech tree / inter-game progression
-- Sound
-- Mobile layout
-- Diplomacy between players
-- 3D / canvas renderer pivot (architecture supports it, SVG for now)
+- Sound, mobile layout, diplomacy
 - ActiveEffect type enum (string for now)
-- Portrait images for tribunes and AI personalities (dicebear placeholders)
+- Portrait images (dicebear placeholders)
+- `uses` field consumption in engine (field exists, not yet decremented)
+- Cross-player effect targeting (stubbed in applyPolicyChoice)
+- Dynamic policy weights, procedural flavor text
+- Win condition check implementation
+- Intel visibility (hasLoyaltyIntel flag; enemy troops still visible during playtesting)
+- Fortify connectivity check in UI layer (engine enforces on confirm)
+- "Did you hear?" AI hearsay notifications

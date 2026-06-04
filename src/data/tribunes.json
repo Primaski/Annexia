@@ -5,25 +5,13 @@
     "archetype": "environmentalist",
     "traitWeights": {
       "ecology": 0.9,
-      "militarism": 0.1,
-      "religion": 0.2,
+      "militarism": -0.4,
+      "religion": -0.3,
       "liberty": 0.5,
-      "progress": 0.6
+      "progress": 0.5
     },
-    "policyStances": {
-      "pol_coal_subsidies": {
-        "bias": -0.85,
-        "flavor": "Burying coal ash in our children's future is not an energy policy."
-      },
-      "pol_military_expansion": {
-        "bias": -0.5,
-        "flavor": "Every cannon forged is a forest that will not be planted."
-      },
-      "pol_civil_liberties_act": {
-        "bias": 0.6,
-        "flavor": "A free people are far more likely to protect what they love — including the land."
-      }
-    },
+    "agreeText": "This aligns with what our land and people need.",
+    "disagreeText": "I cannot support a policy that moves us backward.",
     "flavourText": "Progress that poisons the soil is no progress at all.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=1"
   },
@@ -32,26 +20,14 @@
     "name": "General Rask",
     "archetype": "military_hawk",
     "traitWeights": {
-      "militarism": 0.95,
-      "ecology": 0.1,
-      "religion": 0.3,
-      "liberty": 0.2,
-      "progress": 0.4
+      "militarism": 0.9,
+      "ecology": -0.7,
+      "religion": 0.4,
+      "liberty": -0.4,
+      "progress": -0.5
     },
-    "policyStances": {
-      "pol_coal_subsidies": {
-        "bias": 0.5,
-        "flavor": "Domestic fuel keeps the war machine turning when supply lines fail."
-      },
-      "pol_military_expansion": {
-        "bias": 0.95,
-        "flavor": "Hesitation on the border is an invitation written in blood."
-      },
-      "pol_civil_liberties_act": {
-        "bias": -0.6,
-        "flavor": "Freedoms are luxuries that vanish the moment the enemy arrives at the gate."
-      }
-    },
+    "agreeText": "Sound policy. This is how strong nations endure.",
+    "disagreeText": "Weakness disguised as principle. We will pay for this.",
     "flavourText": "A border that can't be defended isn't a border — it's an invitation.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=2"
   },
@@ -60,26 +36,14 @@
     "name": "Director Chen",
     "archetype": "technocrat",
     "traitWeights": {
-      "progress": 0.8,
-      "ecology": 0.5,
-      "militarism": 0.4,
-      "religion": 0.1,
-      "liberty": 0.7
+      "progress": 0.9,
+      "ecology": 0.0,
+      "militarism": 0.2,
+      "religion": -0.7,
+      "liberty": 0.6
     },
-    "policyStances": {
-      "pol_coal_subsidies": {
-        "bias": -0.2,
-        "flavor": "Coal is an inefficient baseline; the numbers consistently favor diversification."
-      },
-      "pol_military_expansion": {
-        "bias": 0.3,
-        "flavor": "Projection of force has measurable deterrence value when calibrated correctly."
-      },
-      "pol_civil_liberties_act": {
-        "bias": 0.4,
-        "flavor": "Protected civil discourse tends to produce more accurate and actionable civic data."
-      }
-    },
+    "agreeText": "The data supports this course of action.",
+    "disagreeText": "The projections on this are not favorable.",
     "flavourText": "Every problem has an optimal solution. Finding it is just a matter of data.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=3"
   },
@@ -90,24 +54,12 @@
     "traitWeights": {
       "religion": 0.8,
       "ecology": 0.5,
-      "militarism": 0.3,
-      "liberty": 0.6,
-      "progress": 0.3
+      "militarism": -0.5,
+      "liberty": 0.7,
+      "progress": -0.3
     },
-    "policyStances": {
-      "pol_coal_subsidies": {
-        "bias": -0.3,
-        "flavor": "It's the miners' lungs that pay the real subsidy — not the shareholders'."
-      },
-      "pol_military_expansion": {
-        "bias": -0.4,
-        "flavor": "The common soldier's family does not share in the general's glory."
-      },
-      "pol_civil_liberties_act": {
-        "bias": 0.8,
-        "flavor": "Rights aren't privileges handed down from above — they belong to every person who breathes."
-      }
-    },
+    "agreeText": "The people will feel seen by this decision.",
+    "disagreeText": "The people bear the costs of choices like this.",
     "flavourText": "The people don't need to be managed. They need to be heard.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=4"
   },
@@ -116,26 +68,14 @@
     "name": "Montgomery Gould",
     "archetype": "industrialist",
     "traitWeights": {
-      "ecology": 0.1,
-      "militarism": 0.7,
-      "religion": 0.5,
-      "liberty": 0.4,
+      "ecology": -0.9,
+      "militarism": 0.6,
+      "religion": 0.0,
+      "liberty": -0.5,
       "progress": 0.6
     },
-    "policyStances": {
-      "pol_coal_subsidies": {
-        "bias": 0.8,
-        "flavor": "Coal built this civilization; withdrawing its support now is the height of ingratitude."
-      },
-      "pol_military_expansion": {
-        "bias": 0.4,
-        "flavor": "Secure borders are good for business — the tariff lines practically write themselves."
-      },
-      "pol_civil_liberties_act": {
-        "bias": -0.3,
-        "flavor": "Too much freedom in the streets means not enough order where it counts."
-      }
-    },
+    "agreeText": "Good for business. Good for the nation.",
+    "disagreeText": "This will cost more than whoever proposed it admits.",
     "flavourText": "Tears make excellent lubricant for the textile looms.",
     "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=5"
   }

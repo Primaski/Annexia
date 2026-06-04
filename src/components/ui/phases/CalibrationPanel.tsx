@@ -5,7 +5,7 @@ export function CalibrationPanel() {
         textAlign: 'center',
         color: '#5a7a8a',
         fontFamily: 'monospace',
-        fontSize: 13,
+        fontSize: 15,
       }}
     >
       Resolving turn...

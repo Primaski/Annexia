@@ -1,7 +1,6 @@
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { coordKey } from '../../engine/hex';
-import { LOYALTY_SCALE } from '../../config';
 import type { TraitVector } from '../../types';
 import { Sprite } from './Sprite';
 
@@ -52,8 +51,8 @@ export function HoverTooltip() {
   const dominantEmojis = TRAITS
     .map(({ key, posEmoji, negEmoji }) => {
       const v = cv[key];
-      if (v >= 0.75) return posEmoji;
-      if (v <= 0.25) return negEmoji;
+      if (v >= 0.5) return posEmoji;
+      if (v <= -0.5) return negEmoji;
       return null;
     })
     .filter((e): e is string => e !== null);
@@ -78,6 +77,7 @@ export function HoverTooltip() {
           <div style={{ fontSize: 16, color: '#e0e8f0' }}>{nationName} (barbarian)</div>
         </div>
         <div style={{ marginBottom: 6 }}>🏡 {tile.name}</div>
+        <div>⚔️ {tile.activeTroops}</div>
         {dominantEmojis.length > 0 && <div>{dominantEmojis.join('')}</div>}
       </div>
     );
@@ -94,8 +94,11 @@ export function HoverTooltip() {
         <div style={{ fontSize: 16, color: '#e0e8f0' }}>{nationName}</div>
       </div>
       <div style={{ marginBottom: 6 }}>🏡 {tile.name}</div>
+      {/* TODO: [REDACT in multiplayer] hide troop count for enemy tiles */}
       <div>⚔️ {tile.activeTroops}</div>
-      <div>😊 {(tile.loyalty / LOYALTY_SCALE).toFixed(1)}</div>
+      {/* TODO: [REDACT in multiplayer] hide loyalty for enemy tiles unless an intel effect is active */}
+      <div>😊 {Math.round(tile.loyalty * 100)}</div>
+      {/* TODO: [REDACT in multiplayer] hide culture vector summary for enemy tiles unless an intel effect is active */}
       {dominantEmojis.length > 0 && <div>Traits: {dominantEmojis.join('')}</div>}
     </div>
   );

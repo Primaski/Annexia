@@ -92,10 +92,10 @@ interface GameState {
   /** Actions remaining for the current player during mobilization. */
   actionsRemaining: number;
   /** Log of troop movements made this mobilization phase. Cleared on advanceTurn. */
-  relocatedTroops: { fromKey: string; toKey: string; count: number; ownerId: string }[];
+  relocatedTroops: { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }[];
   /** Running tally of troops committed from each tile this phase. Used by getTotalAvailableTroops. */
   spentTroopsByTile: Record<string, number>;
-  recordTroopRelocation: (entry: { fromKey: string; toKey: string; count: number; ownerId: string }) => void;
+  recordTroopRelocation: (entry: { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }) => void;
   clearRelocations: () => void;
 
   // ── Config ────────────────────────────────────────────────────────────────
@@ -158,8 +158,8 @@ interface GameState {
    */
   setPendingRoundtable: (reason: RoundtableReason | null) => void;
 
-  /** Decrement actionsRemaining by 1. Floor at 0. */
-  spendAction: () => void;
+  /** Decrement actionsRemaining by amount (default 1). Floor at 0. */
+  spendAction: (amount?: number) => void;
 
   /** Set actionsRemaining directly (called at the start of mobilization). */
   setActionsRemaining: (n: number) => void;
@@ -200,7 +200,7 @@ const initialState = {
   pendingRoundtable: false,
   roundtableReason: null,
   actionsRemaining: 0,
-  relocatedTroops: [] as { fromKey: string; toKey: string; count: number; ownerId: string }[],
+  relocatedTroops: [] as { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }[],
   spentTroopsByTile: {} as Record<string, number>,
   config: DEFAULT_CONFIG,
   winnerId: null,
@@ -273,8 +273,8 @@ export const useGameStore = create<GameState>((set) => ({
   setPendingRoundtable: (reason) =>
     set({ pendingRoundtable: reason !== null, roundtableReason: reason }),
 
-  spendAction: () =>
-    set((state) => ({ actionsRemaining: Math.max(0, state.actionsRemaining - 1) })),
+  spendAction: (amount = 1) =>
+    set((state) => ({ actionsRemaining: Math.max(0, state.actionsRemaining - amount) })),
 
   setActionsRemaining: (actionsRemaining) => set({ actionsRemaining }),
 

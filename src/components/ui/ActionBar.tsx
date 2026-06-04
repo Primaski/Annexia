@@ -13,7 +13,7 @@ export function ActionBar() {
         height: '100%',
         width: '100%',
         overflowY: 'auto',
-        padding: '20px 16px',
+        padding: '22px 18px',
         boxSizing: 'border-box',
         display: 'flex',
         flexDirection: 'column',

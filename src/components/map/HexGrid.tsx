@@ -5,7 +5,7 @@ import { coordKey, hexNeighbors, hexCorners } from '../../engine/hex';
 import { useMapLayout } from '../../hooks/useMapLayout';
 import { HexTile } from './HexTile';
 import { PLAYER_COLORS } from './playerColors';
-import type { Tile, OwnedTile } from '../../types';
+import type { Tile, OwnedTile, Policy } from '../../types';
 
 const SQ3 = Math.sqrt(3);
 const PAD = 8;
@@ -33,6 +33,8 @@ export function HexGrid() {
   const tiles             = useGameStore((state) => state.tiles);
   const players           = useGameStore((state) => state.players);
   const phase             = useGameStore((state) => state.phase);
+  const activePolicyCards      = useGameStore((state) => state.activePolicyCards);
+  const currentPolicyCardIndex = useGameStore((state) => state.currentPolicyCardIndex);
   const mapCols           = useGameStore((state) => state.config.mapCols);
   const mapRows           = useGameStore((state) => state.config.mapRows);
   const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
@@ -40,13 +42,21 @@ export function HexGrid() {
   const setHoveredTile     = useUIStore((state) => state.setHoveredTile);
   const setTooltipPosition = useUIStore((state) => state.setTooltipPosition);
   const draftModeActive    = useUIStore((state) => state.draftModeActive);
+  const invadeModeActive   = useUIStore((state) => state.invadeModeActive);
   const draftSources       = useUIStore((state) => state.draftSources);
   const setDraftClickKey   = useUIStore((state) => state.setDraftClickKey);
   const selectedTileCoord  = useUIStore((state) => state.selectedTileCoord);
-  const humanPlayer = players.find((p) => p.isHuman);
+  const viewingPlayerId = useUIStore((state) => state.viewingPlayerId);
+  const humanPlayer = players.find((p) => p.id === viewingPlayerId);
 
   const containerRef = useRef<HTMLDivElement>(null);
+  const mapRef = useRef<HTMLDivElement>(null);
   const [containerSize, setContainerSize] = useState({ width: 800, height: 600 });
+
+  const [zoom, setZoom] = useState(1);
+  const [pan, setPan] = useState({ x: 0, y: 0 });
+  const isPanning = useRef(false);
+  const lastMouse = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const el = containerRef.current;
@@ -58,6 +68,21 @@ export function HexGrid() {
     ro.observe(el);
     return () => ro.disconnect();
   }, []);
+
+  useEffect(() => {
+    const el = mapRef.current;
+    if (!el) return;
+    const handler = (e: WheelEvent) => e.preventDefault();
+    el.addEventListener('wheel', handler, { passive: false });
+    return () => el.removeEventListener('wheel', handler);
+  }, []);
+
+  useEffect(() => {
+    if (Object.keys(tiles).length > 0) {
+      setZoom(1);
+      setPan({ x: 0, y: 0 });
+    }
+  }, [Object.keys(tiles).length]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const playerIndexById = new Map(players.map((p, i) => [p.id, i]));
 
@@ -74,12 +99,58 @@ export function HexGrid() {
   const svgWidth  = Math.ceil(SQ3 * hexSize * (mapCols + 0.5)) + 2 * PAD;
   const svgHeight = Math.ceil(hexSize * (1.5 * mapRows + 0.5)) + 2 * PAD;
 
+  const activePolicy: Policy | undefined =
+    phase === 'policy' ? activePolicyCards[currentPolicyCardIndex] : undefined;
+
   const tileList = Object.values(tiles);
+
+  function clampPan(x: number, y: number, z: number): { x: number; y: number } {
+    const scaledW = svgWidth * z;
+    const scaledH = svgHeight * z;
+    const maxX = Math.max(0, (scaledW - containerSize.width)  / 2);
+    const maxY = Math.max(0, (scaledH - containerSize.height) / 2);
+    return {
+      x: Math.max(-maxX, Math.min(maxX, x)),
+      y: Math.max(-maxY, Math.min(maxY, y)),
+    };
+  }
 
   return (
     <div
       ref={containerRef}
       style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}
+    >
+    <div
+      ref={mapRef}
+      style={{
+        width: svgWidth,
+        height: svgHeight,
+        transform: `translate(${pan.x}px, ${pan.y}px) scale(${zoom})`,
+        transformOrigin: 'center center',
+        cursor: isPanning.current ? 'grabbing' : 'grab',
+        userSelect: 'none',
+      }}
+      onMouseDown={(e) => {
+        isPanning.current = true;
+        lastMouse.current = { x: e.clientX, y: e.clientY };
+      }}
+      onMouseMove={(e) => {
+        if (!isPanning.current) return;
+        const dx = e.clientX - lastMouse.current.x;
+        const dy = e.clientY - lastMouse.current.y;
+        lastMouse.current = { x: e.clientX, y: e.clientY };
+        setPan((p) => clampPan(p.x + dx, p.y + dy, zoom));
+      }}
+      onMouseUp={() => { isPanning.current = false; }}
+      onMouseLeave={() => { isPanning.current = false; }}
+      onWheel={(e) => {
+        const factor = e.deltaY > 0 ? 1 / 1.1 : 1.1;
+        setZoom((z) => {
+          const next = Math.max(0.4, Math.min(3, z * factor));
+          setPan((p) => clampPan(p.x, p.y, next));
+          return next;
+        });
+      }}
     >
     <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
       <g transform={`translate(${xOffset},${yOffset})`}>
@@ -87,7 +158,11 @@ export function HexGrid() {
         {tileList.map((tile) => {
           const tKey = coordKey(tile.coord);
           const owned = tile.state === 'owned' ? tile as OwnedTile : null;
+          const adjacentToSelected = invadeModeActive && selectedTileCoord !== null
+            ? new Set(hexNeighbors(selectedTileCoord).map(coordKey)).has(tKey)
+            : true;
           const isDraftSource = draftModeActive && owned !== null && owned.ownerId === humanPlayer?.id &&
+            adjacentToSelected &&
             (owned.activeTroops - (spentTroopsByTile[tKey] ?? 0) - (draftSources[tKey] ?? 0)) > 0;
           const isAnnexTarget = phase === 'mobilization' && draftModeActive &&
             selectedTileCoord !== null && tKey === coordKey(selectedTileCoord);
@@ -105,6 +180,8 @@ export function HexGrid() {
                 playerIndex={tile.state === 'owned' ? playerIndexById.get(tile.ownerId) : undefined}
                 isDraftSource={isDraftSource}
                 isAnnexTarget={isAnnexTarget}
+                activePolicy={activePolicy}
+                humanPlayerId={humanPlayer?.id}
                 onClick={() => {
                   if (draftModeActive) {
                     setDraftClickKey(tKey);
@@ -156,6 +233,7 @@ export function HexGrid() {
         })}
       </g>
     </svg>
+    </div>
     </div>
   );
 }

@@ -31,6 +31,12 @@ interface UIState {
   /** Which top-level screen is displayed. App.tsx uses this to decide what to render. */
   screen: ScreenState;
 
+  /**
+   * The id of the human player whose perspective the UI is rendering.
+   * Set once at game start; null before the game begins.
+   */
+  viewingPlayerId: string | null;
+
   // ── Map Interaction ───────────────────────────────────────────────────────
   /**
    * The axial coord of the currently selected tile, or null if none.
@@ -54,14 +60,24 @@ interface UIState {
    */
   activePolicyCardIndex: number;
 
+  /**
+   * Which choice button (0 = first, 1 = second) the player is hovering on the
+   * active policy card, or null if not hovering. Used to drive the loyalty
+   * preview overlay on the map without touching engine state.
+   */
+  policyHoverChoice: 0 | 1 | null;
+
   // ── Annex Draft ───────────────────────────────────────────────────────────
   /** True while the player is selecting troop sources for a pending annex. */
   draftModeActive: boolean;
+  /** True while the player is specifically in invade draft mode (restricts highlight to adjacent tiles). */
+  invadeModeActive: boolean;
   /** The coordKey of the tile the player is drafting an annex toward. */
   draftClickKey: string | null;
   /** Troops allocated from each source tile during the current draft session. */
   draftSources: Record<string, number>;
   setDraftModeActive: (active: boolean) => void;
+  setInvadeModeActive: (active: boolean) => void;
   setDraftClickKey: (key: string | null) => void;
   setDraftSources: (sources: Record<string, number>) => void;
 
@@ -91,6 +107,10 @@ interface UIState {
 
   setActivePolicyCardIndex: (index: number) => void;
 
+  setPolicyHoverChoice: (choice: 0 | 1 | null) => void;
+
+  setViewingPlayerId: (id: string | null) => void;
+
   /** Close all open panels — useful when transitioning between phases. */
   closeAllPanels: () => void;
 }
@@ -99,6 +119,7 @@ interface UIState {
 
 export const useUIStore = create<UIState>((set) => ({
   screen: 'setup',
+  viewingPlayerId: null,
   simulationMode: false,
   simAutoAdvance: false,
   selectedTileCoord: null,
@@ -106,7 +127,9 @@ export const useUIStore = create<UIState>((set) => ({
   tooltipPosition: { x: 0, y: 0 },
   activeOverlay: null,
   activePolicyCardIndex: 0,
+  policyHoverChoice: null,
   draftModeActive: false,
+  invadeModeActive: false,
   draftClickKey: null,
   draftSources: {},
   vetoResult: null,
@@ -115,6 +138,8 @@ export const useUIStore = create<UIState>((set) => ({
   setSimAutoAdvance: (simAutoAdvance) => set({ simAutoAdvance }),
 
   setScreen: (screen) => set({ screen }),
+
+  setViewingPlayerId: (viewingPlayerId) => set({ viewingPlayerId }),
 
   selectTile: (selectedTileCoord) => set({ selectedTileCoord }),
 
@@ -127,10 +152,13 @@ export const useUIStore = create<UIState>((set) => ({
   setActivePolicyCardIndex: (activePolicyCardIndex) =>
     set({ activePolicyCardIndex }),
 
+  setPolicyHoverChoice: (policyHoverChoice) => set({ policyHoverChoice }),
+
   closeAllPanels: () =>
-    set({ selectedTileCoord: null }),
+    set({ selectedTileCoord: null, policyHoverChoice: null }),
 
   setDraftModeActive: (draftModeActive) => set({ draftModeActive }),
+  setInvadeModeActive: (invadeModeActive) => set({ invadeModeActive }),
   setDraftClickKey: (draftClickKey) => set({ draftClickKey }),
   setDraftSources: (draftSources) => set({ draftSources }),
 

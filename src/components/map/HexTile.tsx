@@ -1,6 +1,7 @@
 import { hexCorners } from '../../engine/hex';
 import { useUIStore } from '../../store/uiStore';
-import type { Tile, PixelCoord, TraitVector } from '../../types';
+import type { Tile, PixelCoord, TraitVector, Policy } from '../../types';
+import { DEFAULT_CONFIG } from '../../config';
 import { PLAYER_COLORS } from './playerColors';
 
 const TILE_FILL: Record<Tile['state'], string> = {
@@ -40,7 +41,7 @@ function lerpColor(from: string, to: string, t: number): string {
 }
 
 function loyaltyToColor(loyalty: number): string {
-  const t = Math.max(0, Math.min(1, (loyalty + 10000) / 20000));
+  const t = Math.max(0, Math.min(1, (loyalty + 1) / 2));
   for (let i = 0; i < LOYALTY_STOPS.length - 1; i++) {
     const [t0, c0] = LOYALTY_STOPS[i];
     const [t1, c1] = LOYALTY_STOPS[i + 1];
@@ -64,11 +65,14 @@ interface HexTileProps {
   playerIndex?: number;
   isDraftSource?: boolean;
   isAnnexTarget?: boolean;
+  activePolicy?: Policy;
+  humanPlayerId?: string;
   onClick?: () => void;
 }
 
-export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, onClick }: HexTileProps) {
-  const activeOverlay = useUIStore((state) => state.activeOverlay);
+export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, activePolicy, humanPlayerId, onClick }: HexTileProps) {
+  const activeOverlay      = useUIStore((state) => state.activeOverlay);
+  const policyHoverChoice  = useUIStore((state) => state.policyHoverChoice);
 
   const points = hexCorners(center, size)
     .map(({ x, y }) => `${x.toFixed(2)},${y.toFixed(2)}`)
@@ -98,36 +102,67 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
 
   if (isDraftSource) { fill = '#5a9ecc'; }
   if (tile.state === 'owned' && tile.activeTroops > 0) { fill = darkenColor(fill, 0.85); }
+  if (tile.state === 'barbarian') {
+    fill = tile.activeTroops >= 1 ? '#a05c3b' : '#c8a882';
+  }
 
-  if (!document.getElementById('annex-pulse-style')) {
+  let loyaltyOverlayColor: string | null = null;
+
+  if (
+    activePolicy !== undefined &&
+    policyHoverChoice !== null &&
+    tile.state === 'owned' &&
+    humanPlayerId !== undefined &&
+    tile.ownerId === humanPlayerId
+  ) {
+    const isDecline = policyHoverChoice === 1;
+    const declineMod = activePolicy.declineModifier ?? 1.0;
+    let delta = 0;
+    for (const [trait, shift] of Object.entries(activePolicy.alignmentShift) as Array<[keyof TraitVector, number]>) {
+      const appliedShift = isDecline ? -shift * declineMod : shift;
+      delta += appliedShift * tile.cultureVector[trait as keyof TraitVector];
+    }
+    delta *= DEFAULT_CONFIG.policy.loyaltyModifierScale;
+
+    if (delta > 0.02) {
+      loyaltyOverlayColor = '#FFD700';
+    } else if (delta < -0.02) {
+      loyaltyOverlayColor = '#441500';
+    }
+  }
+
+  if (!document.getElementById('hex-pulse-styles')) {
     const el = document.createElement('style');
-    el.id = 'annex-pulse-style';
-    el.textContent = '@keyframes annexPulse { 0% { opacity: 0 } 50% { opacity: 0.5 } 100% { opacity: 0 } }';
+    el.id = 'hex-pulse-styles';
+    el.textContent =
+      '@keyframes annexPulse { 0% { opacity: 0 } 50% { opacity: 0.5 } 100% { opacity: 0 } }' +
+      '@keyframes loyaltyPulse { 0% { opacity: 0 } 50% { opacity: 0.45 } 100% { opacity: 0 } }';
     document.head.appendChild(el);
   }
 
-  const basePolygon = (
-    <polygon
-      points={points}
-      fill={fill}
-      fillOpacity={fillOpacity}
-      onClick={onClick}
-      style={onClick ? { cursor: 'pointer' } : undefined}
-    />
-  );
-
-  if (isAnnexTarget) {
-    return (
-      <>
-        {basePolygon}
+  return (
+    <>
+      <polygon
+        points={points}
+        fill={fill}
+        fillOpacity={fillOpacity}
+        onClick={onClick}
+        style={onClick ? { cursor: 'pointer' } : undefined}
+      />
+      {isAnnexTarget && (
         <polygon
           points={points}
           fill={PLAYER_COLORS[playerIndex ?? 0]}
           style={{ animation: 'annexPulse 1.2s ease-in-out infinite', pointerEvents: 'none' }}
         />
-      </>
-    );
-  }
-
-  return basePolygon;
+      )}
+      {loyaltyOverlayColor !== null && (
+        <polygon
+          points={points}
+          fill={loyaltyOverlayColor}
+          style={{ animation: 'loyaltyPulse 1.0s ease-in-out infinite', pointerEvents: 'none' }}
+        />
+      )}
+    </>
+  );
 }

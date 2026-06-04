@@ -78,7 +78,7 @@ export default function App() {
         <div
           style={{
             flexShrink: 0,
-            height: '36px',
+            height: '40px',
             width: '100%',
             background: '#0f1923',
             borderBottom: '1px solid #1e2d3a',
@@ -88,7 +88,7 @@ export default function App() {
             padding: '0 16px',
             boxSizing: 'border-box',
             fontFamily: 'monospace',
-            fontSize: '13px',
+            fontSize: '14px',
             color: '#c0c8d0',
           }}
         >
@@ -102,11 +102,14 @@ export default function App() {
           {/* NOTIFICATION BAR */}
           <div
             style={{
-              flexShrink: 0,
+              minWidth: '200px',
               width: '200px',
+              flexShrink: 1,
               height: '100%',
               background: '#0f1923',
               borderRight: '1px solid #1e2d3a',
+              position: 'relative',
+              zIndex: 2,
             }}
           >
             <NotificationPanel />
@@ -119,6 +122,8 @@ export default function App() {
               height: '100%',
               background: '#0f1923',
               position: 'relative',
+              overflow: 'hidden',
+              zIndex: 0,
             }}
           >
             <HexGrid />
@@ -129,12 +134,15 @@ export default function App() {
           {/* ACTION BAR */}
           <div
             style={{
-              flexShrink: 0,
+              minWidth: '210px',
               width: '420px',
+              flexShrink: 1,
               height: '100%',
               background: '#0f1923',
               borderLeft: '1px solid #1e2d3a',
               overflow: 'hidden',
+              position: 'relative',
+              zIndex: 2,
             }}
           >
             <ActionBar />

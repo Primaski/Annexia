@@ -454,11 +454,11 @@ export function generateMap(
     const cnx = nx * config.cultureNoiseScale;
     const cny = ny * config.cultureNoiseScale;
     const cultureVector: TraitVector = {
-      ecology:       (cultureNoise[0](cnx, cny) + 1) / 2,
-      militarism:    (cultureNoise[1](cnx, cny) + 1) / 2,
-      religion:      (cultureNoise[2](cnx, cny) + 1) / 2,
-      liberty: (cultureNoise[3](cnx, cny) + 1) / 2,
-      progress: 1 - (cultureNoise[4](cnx, cny) + 1) / 2,
+      ecology:    cultureNoise[0](cnx, cny),
+      militarism: cultureNoise[1](cnx, cny),
+      religion:   cultureNoise[2](cnx, cny),
+      liberty:    cultureNoise[3](cnx, cny),
+      progress:  -cultureNoise[4](cnx, cny),
     };
 
     landCoords.push(coord);
@@ -475,11 +475,10 @@ export function generateMap(
     landCoords, barbarianCount, clusterSeedCount, cols, rows, rand
   );
 
-  // Step 3c: Stamp barbarian state and assign defense values (20–60)
+  // Step 3c: Stamp barbarian state (troops assigned after nation IDs are known)
   const stampedTiles = tiles.map((tile): Tile => {
     if (tile.state !== 'unclaimed' || !barbarianKeys.has(coordKey(tile.coord))) return tile;
-    const defense = Math.floor(rand() * 41) + 20;
-    return { ...tile, state: 'barbarian' as const, defense };
+    return { ...tile, state: 'barbarian' as const, activeTroops: 0, previousOwner: null };
   });
 
   // Step 3d: Flood-fill barbarian tiles to assign contiguous nation IDs
@@ -516,6 +515,43 @@ export function generateMap(
     for (const cKey of clusterKeys) {
       const t = tileByKey.get(cKey)!;
       tileByKey.set(cKey, { ...t, nationId } as Tile);
+    }
+  }
+
+  // Step 3e: Assign activeTroops per barbarian nation cluster.
+  // troopsPerTile maps militarism [-1, 1] → [10, 20].
+  // Each tile gets floorPerTile guaranteed; the remainder is distributed randomly.
+  const barbarianByNation = new Map<string, string[]>();
+  for (const [key, tile] of tileByKey) {
+    if (tile.state !== 'barbarian') continue;
+    const nid = tile.nationId!;
+    if (!barbarianByNation.has(nid)) barbarianByNation.set(nid, []);
+    barbarianByNation.get(nid)!.push(key);
+  }
+
+  for (const [, clusterKeys] of barbarianByNation) {
+    const clusterSize = clusterKeys.length;
+    let militarismSum = 0;
+    for (const cKey of clusterKeys) {
+      const t = tileByKey.get(cKey)!;
+      if (t.state === 'barbarian') militarismSum += t.cultureVector.militarism;
+    }
+    const avgMilitarism = militarismSum / clusterSize;
+    const troopsPerTile = 10 + ((avgMilitarism + 1) / 2) * 10;
+    const totalTroops = Math.round(troopsPerTile * clusterSize);
+    const floorPerTile = Math.round(troopsPerTile / 3);
+
+    const troopCounts = new Array<number>(clusterSize).fill(floorPerTile);
+    const remaining = totalTroops - floorPerTile * clusterSize;
+    for (let i = 0; i < remaining; i++) {
+      troopCounts[Math.floor(rand() * clusterSize)]++;
+    }
+
+    for (let i = 0; i < clusterSize; i++) {
+      const t = tileByKey.get(clusterKeys[i])!;
+      if (t.state === 'barbarian') {
+        tileByKey.set(clusterKeys[i], { ...t, activeTroops: troopCounts[i] });
+      }
     }
   }
 
