@@ -1,5 +1,5 @@
 # Annexia — Game Design Document
-*Working title. Last updated: post-session-13.*
+*Working title. Last updated: post-session-15.*
 
 ---
 
@@ -36,10 +36,26 @@ The core tension: your people are not yours by default. They have cultures, beli
 - Land/water placed via Voronoi regions + Simplex noise. Inland lakes removed by flood-fill.
 - Landmass centroid is shifted to the grid center after generation.
 - Each land tile gets a **culture vector** at generation — five trait values on `[-1, 1]`. Neighboring tiles have similar vectors; divergence increases with distance, producing organic cultural regions.
+- Each land tile gets a **terrain type** at generation via a second independent Voronoi pass (biome pass). Biome regions are assigned weighted terrain types; coast is a post-pass override for any land tile adjacent to water.
 - Barbarian tiles are clustered via randomized BFS from random seeds. Each contiguous cluster forms one barbarian nation with a generated name.
 - **Barbarian troop counts** are assigned at generation based on the cluster's average `militarism` culture trait: `troopsPerTile = 10 + (avgMilitarism + 1) / 2 × 10` (range 10–20 per tile). A floor of `round(troopsPerTile / 3)` guarantees every tile has troops. Remainder distributed randomly across the cluster via seeded PRNG.
 - Barbarian tile color scales with troop count: lightly garrisoned tiles appear lighter than the base color; heavily garrisoned tiles appear darker.
 - All land tiles have a generated name (2–3 syllable fantasy name, seeded PRNG).
+
+### Terrain Types
+Every land tile has a `terrainType` — a discrete value used for gameplay mechanics and visual rendering. Water tiles have no terrain type.
+
+| Type | Description | Planned gameplay hooks |
+|---|---|---|
+| `plains` | Open grassland, majority of land tiles | Farmland, food output |
+| `forest` | Dense woodland, organic clusters | Small defense bonus, resource potential, environmentalist affinity |
+| `hills` | Rocky elevated terrain | Defense bonus, extra AP cost to invade, mineral resources |
+| `desert` | Harsh arid land | Natural resources beneath surface, low habitability |
+| `coast` | Water-adjacent land | Fishing/food output, future port cities, troop transport, bridge building |
+
+Terrain types are **discrete gameplay values** — `terrainType` on the tile is always a clean enum. Visual blending at biome boundaries is a rendering concern only and does not affect the stored type.
+
+**Tile purpose designations** (military base, capital marker, etc.) are a planned future direction that will build on `terrainType` as a foundation. Tabled until mechanics justify them.
 
 ### Map Navigation
 - The map starts centered and fully fitted to the screen on every new game.
@@ -292,6 +308,7 @@ Five named regions. See architecture.md for full spec.
 Hover tooltip: immediate, no delay, tracks cursor.
 Tile detail panel: visible during policy phase only — floating, draggable, top-right of map area. Suppressed during mobilization (content moves to action bar instead).
 During mobilization: clicking a tile populates the action bar with that tile's detail content. Confirming an action keeps the tile selected. End Turn always pinned at bottom of action bar.
+Right-click shortcut: during mobilization, right-clicking a tile triggers the first available action (Annex / Fortify / Invade) as if the player had clicked the tile and pressed the action button. A floating toast pill appears near the cursor — green with the action name on success, red with the blocked reason if AP or troops are insufficient. The action still navigates to the "pick sources" draft screen; right-click is a shortcut to that screen, not a one-click confirm.
 Effects bar: floats top-left of map area with semi-transparent backing, shows active effect icons. Suspended effects shown faded. Multiple instances of the same card are grouped under one icon with a count badge; hovering shows all instances' durations stacked.
 
 ---
@@ -299,9 +316,11 @@ Effects bar: floats top-left of map area with semi-transparent backing, shows ac
 ## Out of Scope (for now)
 
 - Multiplayer over network (Phase 5) — architecture designed for clean Firebase integration
+- **Mobilization interaction redesign** — current flow is "pick destination → pick sources" (to→from). Planned redesign to "pick source → pick destination" (from→to), which better matches player intent and eliminates cross-screen mouse travel. Substantial refactor of TileDetailContent, HexGrid interaction model, and MobilizationPanel. Deferred to next session.
 - Advisor overrule / passive alignment nudge (tribune influence)
 - Confidence score mechanics
-- Portrait images (dicebear placeholders in use)
+- Tribune portrait fine-tuning (dicebear styles now curated per tribune; further polish deferred)
+- Tile purpose designations (military base, capital marker, etc.) — planned, tabled until mechanics justify
 - Sound
 - Mobile layout
 - Diplomacy (treaties, non-aggression pacts)

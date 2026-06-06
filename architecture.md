@@ -51,7 +51,9 @@ src/
                                 stepLoyalty, isBreakawayCandidate, SPAWN_LOYALTY
     mapGen.ts                ← Voronoi + noise land/water, culture vectors, barbarian
                                 clusters (with militarism-scaled troop assignment),
-                                nation flood-fill. Returns MapGenResult.
+                                nation flood-fill. Second Voronoi pass assigns biome
+                                regions (assignBiomes); coast overrides land tiles
+                                adjacent to water. Returns MapGenResult.
     names.ts                 ← generateName(rand). 80-syllable bank. Seeded, pure.
     policy.ts                ← drawPolicyCards, computeSentimentShifts,
                                 computeVetoProbability, resolvePolicyVeto,
@@ -70,6 +72,13 @@ src/
     uiStore.ts               ← UI-only state. selectedTile, hoveredTile, tooltip
                                 position, activeOverlay, vetoResult, policyHoverChoice,
                                 viewingPlayerId, invadeModeActive, setInvadeModeActive.
+                                toasts: ToastMessage[] + pushToast/dismissToast — floating
+                                cursor-adjacent toast queue (success/error variants).
+                                pendingRightClickAction: 'annex'|'invade'|'fortify'|null —
+                                set by HexGrid on right-click; consumed by TileDetailContent
+                                to activate draft mode after tileKey cleanup runs.
+                                pendingActionFlash: boolean — triggers red button flash in
+                                TileDetailContent on blocked right-click actions.
 
   hooks/
     useGame.ts               ← Bridge between engine and store.
@@ -80,19 +89,42 @@ src/
                                 getInvadableTileKeysForPlayer,
                                 getMilitarySpentByTile (exported helper),
                                 getReceivedPassiveByTile (exported helper),
-                                RelocationEntry (exported type)
+                                RelocationEntry (exported type),
+                                getAvailableActionsForTile (exported helper) —
+                                returns AvailableAction[] for a tile; used by HexGrid
+                                right-click and available to future consumers.
+                                AvailableAction: { type, canAfford, blockedReason? }
+                                ActionBlockedReason: 'no_ap'|'no_troops'|
+                                  'no_adjacent_troops'|'no_connected_troops'
     useMapLayout.ts          ← hexToPixel wrapper, stable callback
 
   components/
     map/
       HexGrid.tsx            ← SVG container. ResizeObserver sizing. Mouse event
-                                wiring. Territory border edges. Pan and zoom via
-                                CSS transform on inner wrapper div. No game logic.
-                                isDraftSource respects invadeModeActive — when invading,
-                                only tiles adjacent to selectedTileCoord are highlighted.
-      HexTile.tsx            ← Individual hex polygon. Fill color by state/overlay.
+                                wiring. Pan and zoom via CSS transform on inner wrapper div.
+                                <defs> block defines 5 terrain SVG filters (terrain-plains,
+                                terrain-forest, terrain-hills, terrain-desert, terrain-coast)
+                                using feTurbulence + multiply blend.
+                                Territory border edges: owned tiles get two-line pulsing
+                                borders (base strokeWidth=2.5 + pulse strokeWidth=3.5,
+                                borderPulse 2.4s animation); barbarian borders are single
+                                static lines. isDraftSource respects invadeModeActive.
+                                onContextMenu on tile <g>: during mobilization, calls
+                                getAvailableActionsForTile, pushes toast, sets
+                                pendingRightClickAction in uiStore. Silent no-op if no
+                                action available. Browser context menu suppressed.
+                                No game logic.
+      HexTile.tsx            ← Individual hex polygon. Terrain tint via TERRAIN_TINT map;
+                                unowned tiles use blended terrain tint directly; owned tiles
+                                blend lerpColor(playerColor, terrainTint, 0.35).
+                                blendedTerrainTint() averages tint across self (weight 2)
+                                and all 6 neighbors (weight 1 each) for smooth biome edges.
+                                Receives tiles?: Record<string, Tile> prop for neighbor lookup.
+                                Terrain filter applied to base polygon via filter prop.
+                                Barbarian tiles use faction overlay: lerpColor(terrainTint,
+                                '#8B4A2A', 0.80) + troop darkening.
                                 Loyalty preview overlay on policy hover.
-                                Barbarian tiles color-scaled by activeTroops.
+                                borderPulse keyframe injected alongside annexPulse/loyaltyPulse.
       MapFilters.tsx         ← Overlay toggle buttons. Default + traits + loyalty.
     ui/
       ActionBar.tsx          ← Phase router. Renders one panel component per phase.
@@ -111,8 +143,19 @@ src/
                                 Subtracts receivedPassiveByTile in military eligibility checks.
                                 Confirm handlers do NOT call selectTile(null) — tile stays
                                 selected after action.
+                                Watches pendingRightClickAction from uiStore — activates
+                                appropriate draft mode after tileKey cleanup resolves.
+                                Watches pendingActionFlash — flashes action button red for
+                                600ms on blocked right-click, then clears flag.
+                                Owned tile header: Sprite + nation name (via player.nationId
+                                → nations lookup), matching HoverTooltip display.
       NotificationBubbles.tsx ← Export: NotificationPanel. Vertical list in notif bar.
                                 Severity-colored text. Filters to viewingPlayerId + 'global'.
+      ToastLayer.tsx         ← Floating toast overlay. Reads toasts[] from uiStore.
+                                Each ToastItem is absolutely positioned at {x,y} from the
+                                cursor event, fades out over 1s via CSS keyframe, then
+                                unmounts via dismissToast(). Mounted in App.tsx as last child.
+                                zIndex 9999. pointer-events none.
       Sprite.tsx             ← Image or lettered placeholder. Reusable.
       MapTuningPanel.tsx     ← Dev tool for map config sliders.
       EffectsBar.tsx         ← Floating top-left of map. Active effect icons + tooltips.
@@ -129,6 +172,9 @@ src/
 
   types/
     index.ts                 ← All shared interfaces. Single import source.
+                                TerrainType: 'plains' | 'forest' | 'hills' | 'desert' | 'coast'
+                                LandTile carries terrainType: TerrainType (inherited by
+                                UnclaimedTile, BarbarianTile, OwnedTile). WaterTile excluded.
                                 LoyaltyLogEntry: { label: string; delta: number }
                                 CONQUEST_LOYALTY_UNCLAIMED (+0.30), CONQUEST_LOYALTY_BARBARIAN (-0.30),
                                 CONQUEST_LOYALTY_RECLAIMED (-0.50) exported constants.
@@ -138,6 +184,9 @@ src/
                                 combat.lanchesterExponent (default 3) — army-size scaling factor.
                                 combat.defenderBonus (default 1.07) — structural defender advantage;
                                 intentionally exposed for future card effects.
+                                map.biomeGrain (default 14) — Voronoi region density for biome pass.
+                                map.biomeWeights — relative weights for plains/forest/hills/desert
+                                assignment. Coast never weighted; assigned by adjacency post-pass.
   App.tsx                    ← Layout shell + phase-driven useEffect hooks.
   main.tsx                   ← Vite entry point.
 ```
@@ -423,6 +472,7 @@ Do not violate this rule. If you find a reason to put a React component inside t
 ## Things Intentionally Deferred
 
 - Multiplayer (Phase 5, Firebase)
+- Mobilization interaction redesign — current to→from flow (pick destination, then sources) to be replaced with from→to (pick source tile, then destination). Eliminates cross-screen mouse travel. Requires significant refactor of TileDetailContent, HexGrid interaction model, MobilizationPanel.
 - AI mobilization beyond basic annex
 - Confidence score mechanics
 - Tribune veto probability tuning (0.15 shift is placeholder)
@@ -436,7 +486,7 @@ Do not violate this rule. If you find a reason to put a React component inside t
 - Tech tree / inter-game progression
 - Sound, mobile layout, diplomacy
 - ActiveEffect type enum (string for now)
-- Portrait images (dicebear placeholders)
+- Tribune portrait fine-tuning (dicebear styles curated per tribune; further polish deferred)
 - `uses` field consumption in engine (field exists, not yet decremented)
 - Cross-player effect targeting (stubbed in applyPolicyChoice)
 - Dynamic policy weights, procedural flavor text
