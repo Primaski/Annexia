@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import type { ActiveEffect } from '../../types';
 
 export type CardTooltipEffect = Pick<
@@ -26,12 +27,21 @@ export function CardTooltipContent({
   effect: CardTooltipEffect;
   mousePos: { x: number; y: number };
 }): JSX.Element {
-  return (
+  const TOOLTIP_W = 150;
+  const TOOLTIP_H = 155;
+  const OFFSET = 10;
+  const clipsRight  = mousePos.x + OFFSET + TOOLTIP_W > window.innerWidth;
+  const clipsBottom = mousePos.y + OFFSET + TOOLTIP_H > window.innerHeight;
+  const flip = clipsRight || clipsBottom;
+  const left = flip ? mousePos.x - OFFSET - TOOLTIP_W : mousePos.x + OFFSET;
+  const top  = flip ? mousePos.y - OFFSET - TOOLTIP_H : mousePos.y + OFFSET;
+
+  return createPortal(
     <div
       style={{
         position: 'fixed',
-        left: mousePos.x + 14,
-        top: mousePos.y + 20,
+        left,
+        top,
         background: '#1a2a35',
         border: '1px solid #2a3f50',
         borderRadius: 4,
@@ -40,29 +50,30 @@ export function CardTooltipContent({
         flexDirection: 'column',
         alignItems: 'center',
         gap: 8,
-        width: 160,
+        width: 200,
         boxSizing: 'border-box',
         whiteSpace: 'normal',
         fontFamily: 'monospace',
         pointerEvents: 'none',
-        zIndex: 200,
+        zIndex: 9999,
       }}
     >
-      <div style={{ fontSize: 13, color: '#e0e8f0', fontWeight: 'bold', textAlign: 'center' }}>
+      <div style={{ fontSize: 20, color: '#e0e8f0', fontWeight: 'bold', textAlign: 'center' }}>
         {effect.title}
       </div>
       <img src={effectTypeImage(effect.type)} alt={effect.type} width={48} height={48} />
-      <div style={{ fontSize: 11, color: '#c0c8d0', textAlign: 'center', wordBreak: 'break-word' }}>
+      <div style={{ fontSize: 14, color: '#c0c8d0', textAlign: 'center', wordBreak: 'break-word' }}>
         {effect.description}
       </div>
-      <div style={{ fontSize: 11, color: '#8aa0b0', textAlign: 'center' }}>
+      <div style={{ fontSize: 14, color: '#8aa0b0', textAlign: 'center' }}>
         {formatMechanical(effect)}
       </div>
       {'enabled' in effect && !effect.enabled && (
-        <div style={{ fontSize: 11, color: '#c0392b', fontWeight: 'bold', letterSpacing: 1 }}>
+        <div style={{ fontSize: 14, color: '#c0392b', fontWeight: 'bold', letterSpacing: 1 }}>
           DISABLED
         </div>
       )}
-    </div>
+    </div>,
+    document.body,
   );
 }

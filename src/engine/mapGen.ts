@@ -14,7 +14,7 @@
 import { createNoise2D } from 'simplex-noise';
 import { coordKey, generateGridCoords, hexNeighbors, isInGrid } from './hex';
 import type { AxialCoord, PixelCoord } from './hex';
-import type { TraitVector, Tile, Nation } from '../types';
+import type { TraitVector, Tile, Nation, TerrainType } from '../types';
 import { generateName } from './names';
 import type { TuningConfig } from '../config';
 
@@ -284,7 +284,7 @@ const LLOYD_ITERATIONS = 3;
 const BARBARIAN_CLUSTER_SIZE = 8;
 
 const TRAIT_KEYS: (keyof TraitVector)[] = [
-  'ecology', 'militarism', 'religion', 'liberty', 'progress',
+  'ecology', 'militarism', 'religion', 'individualism', 'progress',
 ];
 
 /**
@@ -390,6 +390,80 @@ function centerLandmass(
   return shifted;
 }
 
+// ─── Step 2.6: Biome Assignment ───────────────────────────────────────────────
+
+/**
+ * Assign a TerrainType to every land tile using a second Voronoi pass.
+ *
+ * Biome Voronoi seeds use a scrambled variant of the master seed so the biome
+ * layout is visually independent of the land/water layout while remaining
+ * fully reproducible. `rand` is the caller's PRNG for region-to-biome draws,
+ * kept separate so biome grain changes don't affect barbarian/culture randomness.
+ *
+ * Coast override: any land tile adjacent to water (or the map edge) becomes
+ * 'coast' regardless of its Voronoi-assigned biome.
+ */
+function assignBiomes(
+  landWater: Map<string, 'land' | 'water'>,
+  coords: AxialCoord[],
+  cols: number,
+  rows: number,
+  biomeWeights: { plains: number; forest: number; hills: number; desert: number },
+  biomeGrain: number,
+  rand: () => number,
+  seed: number
+): Map<string, TerrainType> {
+  const biomeSeed = (seed ^ 0xa3b2c1d0) >>> 0;
+  const biomeCount = Math.floor((cols * rows) / biomeGrain);
+  const rawPoints = generatePoints(cols, rows, biomeCount, biomeSeed);
+  const biomePoints = lloydRelaxation(rawPoints, LLOYD_ITERATIONS, cols, rows, biomeSeed);
+
+  // Weighted selection: normalize weights → cumulative distribution → draw rand()
+  const { plains, forest, hills, desert } = biomeWeights;
+  const total = plains + forest + hills + desert;
+  const cum = [
+    plains / total,
+    (plains + forest) / total,
+    (plains + forest + hills) / total,
+    1.0,
+  ];
+  const biomeNames: ('plains' | 'forest' | 'hills' | 'desert')[] = ['plains', 'forest', 'hills', 'desert'];
+
+  const regionBiomes: TerrainType[] = biomePoints.map(() => {
+    const r = rand();
+    for (let i = 0; i < cum.length; i++) {
+      if (r < cum[i]) return biomeNames[i];
+    }
+    return 'plains';
+  });
+
+  // First pass: assign Voronoi region biome to each land tile
+  const result = new Map<string, TerrainType>();
+  const landCoordList: AxialCoord[] = [];
+
+  for (const coord of coords) {
+    const key = coordKey(coord);
+    if (landWater.get(key) !== 'land') continue;
+    landCoordList.push(coord);
+    const regionIdx = nearestRegionIndex(axialToGridSpace(coord), biomePoints);
+    result.set(key, regionBiomes[regionIdx]);
+  }
+
+  // Second pass: coast override — any land tile touching water or the map edge
+  for (const coord of landCoordList) {
+    const key = coordKey(coord);
+    for (const neighbor of hexNeighbors(coord)) {
+      const nKey = coordKey(neighbor);
+      if (landWater.get(nKey) === 'water' || !landWater.has(nKey)) {
+        result.set(key, 'coast');
+        break;
+      }
+    }
+  }
+
+  return result;
+}
+
 // ─── Public API ───────────────────────────────────────────────────────────────
 
 export interface MapGenResult {
@@ -421,6 +495,14 @@ export function generateMap(
   const landWater = centerLandmass(
     classifyTiles(coords, relaxedPoints, cols, rows, config.noiseScale, config.landRatio, seed),
     coords, cols, rows
+  );
+
+  // Biome assignment — separate PRNG so biome grain changes don't affect culture/barbarian draws
+  const biomeRand = mulberry32(((seed ^ 0xc4d5e6f7) >>> 0));
+  const biomeMap = assignBiomes(
+    landWater, coords, cols, rows,
+    config.biomeWeights, config.biomeGrain,
+    biomeRand, seed
   );
 
   // One independent noise function per culture trait.
@@ -457,12 +539,12 @@ export function generateMap(
       ecology:    cultureNoise[0](cnx, cny),
       militarism: cultureNoise[1](cnx, cny),
       religion:   cultureNoise[2](cnx, cny),
-      liberty:    cultureNoise[3](cnx, cny),
+      individualism: cultureNoise[3](cnx, cny),
       progress:  -cultureNoise[4](cnx, cny),
     };
 
     landCoords.push(coord);
-    tiles.push({ coord, state: 'unclaimed', cultureVector, name: generateName(rand), nationId: null });
+    tiles.push({ coord, state: 'unclaimed', terrainType: biomeMap.get(key) ?? 'plains', cultureVector, name: generateName(rand), nationId: null });
   }
 
   // Step 3b: Grow barbarian clusters from random land seeds

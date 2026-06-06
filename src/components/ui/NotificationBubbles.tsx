@@ -19,7 +19,7 @@ export function NotificationPanel() {
           alignItems: 'center',
           justifyContent: 'center',
           fontFamily: 'monospace',
-          fontSize: 11,
+          fontSize: 14,
           color: '#3a5a6a',
         }}
       >
@@ -37,7 +37,7 @@ export function NotificationPanel() {
             padding: '8px 10px',
             borderBottom: '1px solid #1e2d3a',
             fontFamily: 'monospace',
-            fontSize: 11,
+            fontSize: 16,
             color: '#c0c8d0',
             display: 'flex',
             justifyContent: 'space-between',
@@ -53,7 +53,7 @@ export function NotificationPanel() {
               color: '#5a7a8a',
               cursor: 'pointer',
               fontFamily: 'monospace',
-              fontSize: 12,
+              fontSize: 16,
               padding: '0 0 0 8px',
               lineHeight: 1,
             }}

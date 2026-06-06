@@ -16,6 +16,13 @@ export interface TuningConfig {
     voronoiGrain: number;       // Cell density. Lower = more cells (finer coastlines); Higher = fewer cells (blockier).
     noiseScale: number;         // Simplex noise zoom for island shapes. Lower = wavy; Higher = fractured.
     cultureNoiseScale: number;  // Regional frequency. Lower = large homogeneous zones; Higher = fine variation.
+    biomeGrain: number;         // Controls Voronoi region density for biome assignment. Lower = larger biome zones.
+    biomeWeights: {             // Relative probability weights for biome assignment. coast is never assigned here (overridden by adjacency post-pass).
+      plains: number;
+      forest: number;
+      hills: number;
+      desert: number;
+    };
   };
   loyalty: {
     neighborPressureStrength: number; // Multiplier for neighbor tile pull during calculation.
@@ -56,6 +63,8 @@ export const DEFAULT_CONFIG: TuningConfig = {
     voronoiGrain: 10.0,
     noiseScale: 1.3,
     cultureNoiseScale: 1.0,
+    biomeGrain: 14,
+    biomeWeights: { plains: 0.45, forest: 0.25, hills: 0.15, desert: 0.15 },
   },
   loyalty: {
     neighborPressureStrength: 1.0,

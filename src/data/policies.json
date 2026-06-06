@@ -4,7 +4,7 @@
     "title": "Mandatory Military Service",
     "description": "All able-bodied citizens are required to complete a term of military service. Troop numbers swell; civil liberties contract.",
     "weight": 0.9,
-    "alignmentShift": { "militarism": 0.009, "liberty": -0.007, "progress": -0.003 },
+    "alignmentShift": { "militarism": 0.009, "individualism": -0.007, "progress": -0.003 },
     "declineModifier": 0.5,
     "approveEffect": {
       "title": "Conscription Drive",
@@ -31,7 +31,7 @@
     "title": "Peace Dividend",
     "description": "Redirect military budget to civil infrastructure. Popular with progressives; alarming to security hawks.",
     "weight": 0.85,
-    "alignmentShift": { "militarism": -0.008, "progress": 0.006, "liberty": 0.004 },
+    "alignmentShift": { "militarism": -0.008, "progress": 0.006, "individualism": 0.004 },
     "declineModifier": 0.6,
     "approveEffect": {
       "title": "Peace Dividend",
@@ -85,7 +85,7 @@
     "title": "State Religious Patronage",
     "description": "Formally fund and endorse a state religious institution. Deeply meaningful to the faithful; alienating to secularists.",
     "weight": 0.75,
-    "alignmentShift": { "religion": 0.01, "liberty": -0.005, "progress": -0.004 },
+    "alignmentShift": { "religion": 0.01, "individualism": -0.005, "progress": -0.004 },
     "declineModifier": 0.6,
     "approveEffect": {
       "title": "Temple Upkeep",
@@ -112,7 +112,7 @@
     "title": "Secular Education Act",
     "description": "Standardize public education around civic and scientific curricula, removing religious instruction from state schools.",
     "weight": 0.8,
-    "alignmentShift": { "religion": -0.008, "progress": 0.007, "liberty": 0.003 },
+    "alignmentShift": { "religion": -0.008, "progress": 0.007, "individualism": 0.003 },
     "declineModifier": 0.7,
     "tribuneReactions": {
       "tr_technocrat": { "flavor": "Standardized empirical education is the single highest-return investment a state can make." },
@@ -126,7 +126,7 @@
     "title": "Emergency Conscription",
     "description": "A rapid but brutal expansion of the military through forced enlistment. High troop yield; severe civil cost.",
     "weight": 0.7,
-    "alignmentShift": { "militarism": 0.007, "liberty": -0.01, "progress": -0.005 },
+    "alignmentShift": { "militarism": 0.007, "individualism": -0.01, "progress": -0.005 },
     "declineModifier": 0.4,
     "approveEffect": {
       "title": "Emergency Conscription",
@@ -153,7 +153,7 @@
     "title": "Progressive Tax Reform",
     "description": "Restructure the tax code to place greater burden on accumulated wealth. Popular with the poor; despised by elites.",
     "weight": 0.85,
-    "alignmentShift": { "liberty": 0.005, "progress": 0.006, "religion": -0.002 },
+    "alignmentShift": { "individualism": 0.005, "progress": 0.006, "religion": -0.002 },
     "declineModifier": 0.8,
     "approveEffect": {
       "title": "Progressive Taxation",
@@ -180,7 +180,7 @@
     "title": "Austerity Measures",
     "description": "Slash public spending to stabilize national finances. Improves the budget dramatically; popular with no one.",
     "weight": 0.75,
-    "alignmentShift": { "progress": -0.006, "liberty": -0.004, "ecology": -0.003 },
+    "alignmentShift": { "progress": -0.006, "individualism": -0.004, "ecology": -0.003 },
     "declineModifier": 0.9,
     "approveEffect": {
       "title": "Austerity Measures",
@@ -207,7 +207,7 @@
     "title": "Free Press Protection Act",
     "description": "Enshrine press freedom and prohibit state censorship. Liberties expand; state control narrows.",
     "weight": 0.8,
-    "alignmentShift": { "liberty": 0.009, "progress": 0.004, "religion": -0.002 },
+    "alignmentShift": { "individualism": 0.009, "progress": 0.004, "religion": -0.002 },
     "declineModifier": 0.75,
     "tribuneReactions": {
       "tr_technocrat": { "flavor": "Information flow is a civic infrastructure. This protects it." },
@@ -221,7 +221,7 @@
     "title": "Border Fortification Program",
     "description": "Construct permanent defensive installations along national borders. Expensive and ecologically disruptive; strategically reassuring.",
     "weight": 0.75,
-    "alignmentShift": { "militarism": 0.008, "ecology": -0.005, "liberty": -0.003 },
+    "alignmentShift": { "militarism": 0.008, "ecology": -0.005, "individualism": -0.003 },
     "declineModifier": 0.5,
     "approveEffect": {
       "title": "Fortification Cost",
@@ -248,7 +248,7 @@
     "title": "Civic Works Programme",
     "description": "A major government-led investment in roads, housing, and public utilities. Costly but broadly beloved.",
     "weight": 0.85,
-    "alignmentShift": { "progress": 0.007, "liberty": 0.003, "ecology": 0.002 },
+    "alignmentShift": { "progress": 0.007, "individualism": 0.003, "ecology": 0.002 },
     "declineModifier": 0.7,
     "approveEffect": {
       "title": "Civic Works",
@@ -275,7 +275,7 @@
     "title": "National Surveillance Programme",
     "description": "Deploy widespread monitoring of communications and public spaces in the name of security. Effective; deeply unpopular with libertarians.",
     "weight": 0.7,
-    "alignmentShift": { "liberty": -0.01, "militarism": 0.005, "progress": 0.003 },
+    "alignmentShift": { "individualism": -0.01, "militarism": 0.005, "progress": 0.003 },
     "declineModifier": 0.6,
     "approveEffect": {
       "title": "Surveillance Network",
@@ -302,7 +302,7 @@
     "title": "Subsidize Coal Industry",
     "description": "Redirect government funds to domestic coal producers, boosting energy output and industrial jobs.",
     "weight": 1.0,
-    "alignmentShift": { "ecology": -0.012, "militarism": 0.004, "liberty": -0.003 },
+    "alignmentShift": { "ecology": -0.012, "militarism": 0.004, "individualism": -0.003 },
     "declineModifier": 0.6,
     "tribuneReactions": {
       "tr_environmentalist": { "flavor": "Burying coal ash in our children's future is not an energy policy." },
@@ -316,7 +316,7 @@
     "title": "Expand Standing Army",
     "description": "Authorize a major increase in military personnel and equipment. Costs are significant; so is the deterrent effect.",
     "weight": 0.9,
-    "alignmentShift": { "militarism": 0.01, "liberty": -0.005, "progress": -0.004 },
+    "alignmentShift": { "militarism": 0.01, "individualism": -0.005, "progress": -0.004 },
     "declineModifier": 0.4,
     "tribuneReactions": {
       "tr_military_hawk":    { "flavor": "Hesitation on the border is an invitation written in blood." },
@@ -331,7 +331,7 @@
     "title": "Civil Liberties Reform",
     "description": "Expand rights of assembly, speech, and religious practice. Popular with diverse populations; seen as weakness by traditionalists.",
     "weight": 0.85,
-    "alignmentShift": { "liberty": 0.01, "progress": 0.007, "religion": 0.003 },
+    "alignmentShift": { "individualism": 0.01, "progress": 0.007, "religion": 0.003 },
     "declineModifier": 0.8,
     "tribuneReactions": {
       "tr_environmentalist": { "flavor": "A free people are far more likely to protect what they love — including the land." },

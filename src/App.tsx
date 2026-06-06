@@ -20,6 +20,7 @@ import { HoverTooltip } from './components/ui/HoverTooltip';
 import { TileDetailPanel } from './components/ui/TileDetailPanel';
 import { ActionBar } from './components/ui/ActionBar';
 import { EffectsBar } from './components/ui/EffectsBar';
+import { ToastLayer } from './components/ui/ToastLayer';
 
 export default function App() {
   useMapGen();
@@ -78,7 +79,7 @@ export default function App() {
         <div
           style={{
             flexShrink: 0,
-            height: '40px',
+            height: '50px',
             width: '100%',
             background: '#0f1923',
             borderBottom: '1px solid #1e2d3a',
@@ -88,7 +89,7 @@ export default function App() {
             padding: '0 16px',
             boxSizing: 'border-box',
             fontFamily: 'monospace',
-            fontSize: '14px',
+            fontSize: '18px',
             color: '#c0c8d0',
           }}
         >
@@ -161,6 +162,7 @@ export default function App() {
         >
           <BottomBar />
         </div>
+        <ToastLayer />
       </div>
 
       <HoverTooltip />

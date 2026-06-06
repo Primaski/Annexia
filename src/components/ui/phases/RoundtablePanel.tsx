@@ -147,7 +147,7 @@ export function RoundtablePanel() {
                   outline: isSelected ? '2px solid #c0c8d0' : 'none',
                 }}
               >
-                <Sprite imagePath={tribune.imagePath} name={tribune.name} size={72} />
+                <Sprite imagePath={tribune.imagePath} name={tribune.name} size={108} zoom={1.2} />
                 <div style={{ fontSize: 13, color: '#8aa0b0', textAlign: 'center' }}>
                   {tribune.name}
                 </div>
@@ -164,7 +164,7 @@ export function RoundtablePanel() {
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
         <div style={{ fontSize: 14, color: '#5a7a8a' }}>Your Advisor</div>
         <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
-          <Sprite imagePath={advisor.imagePath} name={advisor.name} size={56} />
+          <Sprite imagePath={advisor.imagePath} name={advisor.name} size={88} zoom={1.2} />
           <div
             style={{
               border: '1px solid #2a3f50',

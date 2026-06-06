@@ -5,7 +5,7 @@ const TRAIT_META: { key: keyof TraitVector; pos: string; posEmoji: string; neg: 
   { key: 'ecology',    pos: 'ecology',    posEmoji: '🌱', neg: 'industry',     negEmoji: '🏭' },
   { key: 'militarism', pos: 'militarism', posEmoji: '⚔️', neg: 'pacifism',     negEmoji: '☮️' },
   { key: 'religion',   pos: 'religion',   posEmoji: '⛪', neg: 'secularism',   negEmoji: '⚛️' },
-  { key: 'liberty',    pos: 'liberty',    posEmoji: '🗽', neg: 'collectivism', negEmoji: '🌎' },
+  { key: 'individualism', pos: 'individualism', posEmoji: '🗽', neg: 'collectivism', negEmoji: '🌎' },
   { key: 'progress',   pos: 'progress',   posEmoji: '🚀', neg: 'tradition',    negEmoji: '⛩️' },
 ];
 

@@ -4,9 +4,9 @@ import { useUIStore } from '../../store/uiStore';
 import { startSimulation, stopSimulation, advanceSimStep } from '../../hooks/useGame';
 
 const btnStyle = (active = false): React.CSSProperties => ({
-  padding: '4px 10px',
+  padding: '6px 14px',
   fontFamily: 'monospace',
-  fontSize: 12,
+  fontSize: 16,
   background: active ? '#c0c8d0' : '#1e2d3a',
   color: active ? '#0f1923' : '#c0c8d0',
   border: '1px solid #2a3f50',
@@ -44,6 +44,7 @@ export function BottomBar() {
               padding: '8px 12px',
               display: 'flex',
               gap: 6,
+              zIndex: 100,
             }}
           >
             <MapFilters />

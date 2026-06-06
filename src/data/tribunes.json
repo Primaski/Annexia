@@ -2,81 +2,97 @@
   {
     "id": "tr_environmentalist",
     "name": "Dr. Mara Voss",
-    "archetype": "environmentalist",
+    "archetype": "ecologist_🌱",
     "traitWeights": {
       "ecology": 0.9,
       "militarism": -0.4,
       "religion": -0.3,
-      "liberty": 0.5,
+      "individualism": 0.5,
       "progress": 0.5
     },
     "agreeText": "This aligns with what our land and people need.",
     "disagreeText": "I cannot support a policy that moves us backward.",
     "flavourText": "Progress that poisons the soil is no progress at all.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=1"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=ixtu6ujl"
   },
   {
     "id": "tr_military_hawk",
-    "name": "General Rask",
-    "archetype": "military_hawk",
+    "name": "Vanguard Jaxx",
+    "archetype": "military_hawk_🪖",
     "traitWeights": {
       "militarism": 0.9,
       "ecology": -0.7,
       "religion": 0.4,
-      "liberty": -0.4,
+      "individualism": -0.4,
       "progress": -0.5
     },
     "agreeText": "Sound policy. This is how strong nations endure.",
     "disagreeText": "Weakness disguised as principle. We will pay for this.",
     "flavourText": "A border that can't be defended isn't a border — it's an invitation.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=2"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=yo9oi9w3"
   },
   {
     "id": "tr_technocrat",
     "name": "Director Chen",
-    "archetype": "technocrat",
+    "archetype": "technocrat_📈",
     "traitWeights": {
       "progress": 0.9,
       "ecology": 0.0,
       "militarism": 0.2,
       "religion": -0.7,
-      "liberty": 0.6
+      "individualism": 0.6
     },
     "agreeText": "The data supports this course of action.",
     "disagreeText": "The projections on this are not favorable.",
     "flavourText": "Every problem has an optimal solution. Finding it is just a matter of data.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=3"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=fi1v9ymz"
   },
   {
     "id": "tr_populist",
     "name": "Sister Calinda",
-    "archetype": "populist",
+    "archetype": "humanitarian_🙏",
     "traitWeights": {
       "religion": 0.8,
       "ecology": 0.5,
       "militarism": -0.5,
-      "liberty": 0.7,
+      "individualism": 0.7,
       "progress": -0.3
     },
     "agreeText": "The people will feel seen by this decision.",
     "disagreeText": "The people bear the costs of choices like this.",
     "flavourText": "The people don't need to be managed. They need to be heard.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=4"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=0jpo2z6u"
   },
   {
     "id": "tr_industrialist",
     "name": "Montgomery Gould",
-    "archetype": "industrialist",
+    "archetype": "industrialist_💸",
     "traitWeights": {
       "ecology": -0.9,
       "militarism": 0.6,
       "religion": 0.0,
-      "liberty": -0.5,
+      "individualism": -0.5,
       "progress": 0.6
     },
     "agreeText": "Good for business. Good for the nation.",
     "disagreeText": "This will cost more than whoever proposed it admits.",
     "flavourText": "Tears make excellent lubricant for the textile looms.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=5"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=hsrx4x3t"
+  },
+  {
+    "id": "tr_commissar",
+    "name": "Commissar Vant",
+    "archetype": "marxist_⛓️‍💥",
+    "traitWeights": {
+      "ecology": -0.2,
+      "militarism": 0.7,
+      "religion": -0.7,
+      "individualism": -0.9,
+      "progress": 0.7
+    },
+    "agreeText": "The collective will is served. Good.",
+    "disagreeText": "Private interest has won today. We will remember this.",
+    "flavourText": "The state is not your enemy. It is your instrument — until the day it no longer needs to be.",
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=m4x7vr9k"
   }
 ]

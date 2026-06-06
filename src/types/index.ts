@@ -33,7 +33,7 @@ export interface TraitVector {
   ecology: number;       // Environmental protection vs. industrial growth
   militarism: number;    // Expansion and defense vs. pacifism
   religion: number;      // Religious identity vs. secularism
-  liberty: number; // Personal freedoms vs. collective control
+  individualism: number; // Personal freedoms vs. collective control
   progress: number; // Openness to change vs. tradition
 }
 
@@ -151,6 +151,8 @@ export interface Nation {
 
 // ─── Tile Types ───────────────────────────────────────────────────────────────
 
+export type TerrainType = 'plains' | 'forest' | 'hills' | 'desert' | 'coast';
+
 /**
  * Internal base types — not exported. Use the specific tile types or Tile union below.
  *
@@ -161,7 +163,8 @@ interface BaseTile {
   coord: AxialCoord; // Axial position on the grid (immutable after generation)
 }
 
-interface LandTile extends BaseTile {
+export interface LandTile extends BaseTile {
+  terrainType: TerrainType;   // Biome assigned at map generation
   cultureVector: TraitVector; // This tile's cultural identity (generated, mostly immutable)
   name: string;               // Generated place name (e.g. "Koltai")
   nationId: string | null;    // References Nation.id; null for unclaimed tiles

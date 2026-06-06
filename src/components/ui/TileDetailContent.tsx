@@ -1,16 +1,17 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
 import { coordKey, hexNeighbors } from '../../engine/hex';
 import { DEFAULT_CONFIG } from '../../config';
 import { getAnnexableTileKeys, performAnnex, performFortify, getInvadableTileKeysForPlayer, performInvade, getReceivedPassiveByTile } from '../../hooks/useGame';
 import type { TraitVector, OwnedTile, BarbarianTile } from '../../types';
+import { Sprite } from './Sprite';
 
 const TRAITS: { key: keyof TraitVector; pos: string; neg: string }[] = [
   { key: 'ecology',    pos: 'ecology',    neg: 'industry'     },
   { key: 'militarism', pos: 'militarism', neg: 'pacifism'     },
   { key: 'religion',   pos: 'religion',   neg: 'secularism'   },
-  { key: 'liberty',    pos: 'liberty',    neg: 'collectivism' },
+  { key: 'individualism', pos: 'individualism', neg: 'collectivism' },
   { key: 'progress',   pos: 'progress',   neg: 'tradition'    },
 ];
 
@@ -33,16 +34,21 @@ interface TileDetailContentProps {
 }
 
 export function TileDetailContent({ tileKey }: TileDetailContentProps) {
-  const draftClickKey       = useUIStore((state) => state.draftClickKey);
-  const draftSources        = useUIStore((state) => state.draftSources);
-  const setDraftModeActive  = useUIStore((state) => state.setDraftModeActive);
-  const setInvadeModeActive = useUIStore((state) => state.setInvadeModeActive);
-  const setDraftClickKey    = useUIStore((state) => state.setDraftClickKey);
-  const setDraftSources     = useUIStore((state) => state.setDraftSources);
-  const viewingPlayerId     = useUIStore((state) => state.viewingPlayerId);
+  const draftClickKey         = useUIStore((state) => state.draftClickKey);
+  const draftSources          = useUIStore((state) => state.draftSources);
+  const setDraftModeActive    = useUIStore((state) => state.setDraftModeActive);
+  const setInvadeModeActive   = useUIStore((state) => state.setInvadeModeActive);
+  const setDraftClickKey      = useUIStore((state) => state.setDraftClickKey);
+  const setDraftSources       = useUIStore((state) => state.setDraftSources);
+  const viewingPlayerId       = useUIStore((state) => state.viewingPlayerId);
+  const pendingActionFlash         = useUIStore((state) => state.pendingActionFlash);
+  const setPendingActionFlash      = useUIStore((state) => state.setPendingActionFlash);
+  const pendingRightClickAction    = useUIStore((state) => state.pendingRightClickAction);
+  const setPendingRightClickAction = useUIStore((state) => state.setPendingRightClickAction);
 
   const tiles             = useGameStore((state) => state.tiles);
   const players           = useGameStore((state) => state.players);
+  const nations           = useGameStore((state) => state.nations);
   const phase             = useGameStore((state) => state.phase);
   const actionsRemaining  = useGameStore((state) => state.actionsRemaining);
   const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
@@ -55,6 +61,8 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
   const [fortifyMode,    setFortifyMode]    = useState(false);
   const [invadeMode,     setInvadeMode]     = useState(false);
   const [loyaltyLogOpen, setLoyaltyLogOpen] = useState(false);
+  const [buttonFlash,    setButtonFlash]    = useState(false);
+  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     setDraftMode(false);
@@ -65,6 +73,14 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
     setInvadeModeActive(false);
     setDraftSources({});
     setDraftClickKey(null);
+    setPendingRightClickAction(null);
+    return () => {
+      if (flashTimerRef.current !== null) {
+        clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = null;
+      }
+      setButtonFlash(false);
+    };
   }, [tileKey]);
 
   useEffect(() => {
@@ -75,6 +91,22 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       setDraftClickKey(null);
     };
   }, []);
+
+  useEffect(() => {
+    if (!pendingRightClickAction) return;
+    if (pendingRightClickAction === 'annex') {
+      setDraftMode(true);
+      setDraftModeActive(true);
+    } else if (pendingRightClickAction === 'fortify') {
+      setFortifyMode(true);
+      setDraftModeActive(true);
+    } else if (pendingRightClickAction === 'invade') {
+      setInvadeMode(true);
+      setDraftModeActive(true);
+      setInvadeModeActive(true);
+    }
+    setPendingRightClickAction(null);
+  }, [tileKey, pendingRightClickAction]);
 
   useEffect(() => {
     if (!draftClickKey || !draftMode) return;
@@ -104,6 +136,22 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
     setDraftSources({ ...draftSources, [draftClickKey]: alreadyAllocated + 1 });
     setDraftClickKey(null);
   }, [draftClickKey]);
+
+  useEffect(() => {
+    if (!pendingActionFlash) return;
+    setButtonFlash(true);
+    flashTimerRef.current = setTimeout(() => {
+      setButtonFlash(false);
+      setPendingActionFlash(false);
+      flashTimerRef.current = null;
+    }, 600);
+    return () => {
+      if (flashTimerRef.current !== null) {
+        clearTimeout(flashTimerRef.current);
+        flashTimerRef.current = null;
+      }
+    };
+  }, [pendingActionFlash]);
 
   useEffect(() => {
     if (!draftClickKey || !invadeMode) return;
@@ -175,10 +223,23 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
   const canFortify = actionsRemaining > 0 && connectedAvailableTroops > 0;
 
   const cv = tile.cultureVector;
-
   return (
     <>
-      {tile.state !== 'unclaimed' && <div style={{ marginBottom: 4 }}>🏡 {tile.name}</div>}
+      {tile.state === 'owned' && (() => {
+        const owner = players.find((p) => p.id === tile.ownerId);
+        const nation = owner?.nationId ? nations[owner.nationId] : null;
+        return (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 10 }}>
+            <Sprite size={100} zoom={1.2} imagePath={owner?.imagePath ?? null} name={owner?.name ?? '?'} />
+            <div>
+              <div style={{ fontSize: 34, color: '#e0e8f0', fontWeight: 'bold' }}>{nation?.name ?? '—'}</div>
+              <div style={{ fontSize: 16, color: '#5a7a8a', marginTop: 4 }}>[{tile.coord.q}, {tile.coord.r}]</div>
+            </div>
+          </div>
+        );
+      })()}
+      {tile.state !== 'owned' && <div style={{ marginBottom: 4 }}>🏡 {tile.name}</div>}
+      {tile.state === 'owned' && <div style={{ marginBottom: 6 }}>🏛️ {tile.name}</div>}
       {tile.state === 'owned' && <div>🛡️ {tile.activeTroops}</div>}
 
       {divider}
@@ -212,7 +273,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
                       const entryColor = entryDelta < 0 ? '#cc4444' : entryDelta > 0 ? '#44cc66' : '#5a7a8a';
                       const entryStr = entryDelta > 0 ? `+${entryDelta}` : `${entryDelta}`;
                       return (
-                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 11, color: '#8a9aaa', marginBottom: 2 }}>
+                        <div key={i} style={{ display: 'flex', justifyContent: 'space-between', fontSize: 16, color: '#8a9aaa', marginBottom: 2 }}>
                           <span>{entry.label}</span>
                           <span style={{ color: entryColor, marginLeft: 8 }}>{entryStr}</span>
                         </div>
@@ -234,10 +295,10 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             disabled={!canAffordAnnex}
             onClick={() => { if (canAffordAnnex) { setDraftMode(true); setDraftModeActive(true); } }}
             style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
               background: canAffordAnnex ? '#1e2d3a' : '#0f1923',
-              color: canAffordAnnex ? '#c0c8d0' : '#3a5060',
-              border: `1px solid ${canAffordAnnex ? '#2a3f50' : '#1a2530'}`,
+              color: buttonFlash ? '#cc4444' : (canAffordAnnex ? '#c0c8d0' : '#3a5060'),
+              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canAffordAnnex ? '#2a3f50' : '#1a2530'}`,
               cursor: canAffordAnnex ? 'pointer' : 'not-allowed',
             }}
           >
@@ -249,14 +310,14 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       {isAnnexable && draftMode && (
         <>
           {divider}
-          <div style={{ fontSize: 11, color: '#5a7a8a', marginBottom: 4 }}>
+          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
             Troops committed: {draftedSoFar} (min {annexTroopMin})
           </div>
-          <div style={{ fontSize: 11, color: '#7a9aaa', marginBottom: 8 }}>
+          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
             Click highlighted tiles to contribute troops.
           </div>
           {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 11, color: '#c0c8d0' }}>
+            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
               {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
             </div>
           ))}
@@ -273,7 +334,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
                 }
               }}
               style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
                 background: draftedSoFar >= annexTroopMin ? '#1e4a2a' : '#0f1923',
                 color: draftedSoFar >= annexTroopMin ? '#80cc90' : '#3a5060',
                 border: `1px solid ${draftedSoFar >= annexTroopMin ? '#2a6a3a' : '#1a2530'}`,
@@ -282,7 +343,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             >Confirm</button>
             <button
               onClick={() => { setDraftMode(false); setDraftModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
             >Cancel</button>
           </div>
         </>
@@ -295,10 +356,10 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             disabled={!canFortify}
             onClick={() => { if (canFortify) { setFortifyMode(true); setDraftModeActive(true); } }}
             style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
               background: canFortify ? '#1e2d3a' : '#0f1923',
-              color: canFortify ? '#c0c8d0' : '#3a5060',
-              border: `1px solid ${canFortify ? '#2a3f50' : '#1a2530'}`,
+              color: buttonFlash ? '#cc4444' : (canFortify ? '#c0c8d0' : '#3a5060'),
+              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canFortify ? '#2a3f50' : '#1a2530'}`,
               cursor: canFortify ? 'pointer' : 'not-allowed',
             }}
           >
@@ -310,14 +371,14 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       {phase === 'mobilization' && tile.state === 'owned' && tile.ownerId === viewingPlayerId && fortifyMode && (
         <>
           {divider}
-          <div style={{ fontSize: 11, color: '#5a7a8a', marginBottom: 4 }}>
+          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
             Moving {draftedSoFar} troop{draftedSoFar !== 1 ? 's' : ''} here
           </div>
-          <div style={{ fontSize: 11, color: '#7a9aaa', marginBottom: 8 }}>
+          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
             Click highlighted tiles to move troops here.
           </div>
           {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 11, color: '#c0c8d0' }}>
+            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
               {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
             </div>
           ))}
@@ -334,7 +395,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
                 }
               }}
               style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
                 background: draftedSoFar > 0 ? '#1e4a2a' : '#0f1923',
                 color: draftedSoFar > 0 ? '#80cc90' : '#3a5060',
                 border: `1px solid ${draftedSoFar > 0 ? '#2a6a3a' : '#1a2530'}`,
@@ -343,7 +404,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             >Confirm</button>
             <button
               onClick={() => { setFortifyMode(false); setDraftModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
             >Cancel</button>
           </div>
         </>
@@ -381,10 +442,10 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             disabled={!canInvade}
             onClick={() => { if (canInvade) { setInvadeMode(true); setDraftModeActive(true); setInvadeModeActive(true); } }}
             style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
               background: canInvade ? '#1e2d3a' : '#0f1923',
-              color: canInvade ? '#c0c8d0' : '#3a5060',
-              border: `1px solid ${canInvade ? '#2a3f50' : '#1a2530'}`,
+              color: buttonFlash ? '#cc4444' : (canInvade ? '#c0c8d0' : '#3a5060'),
+              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canInvade ? '#2a3f50' : '#1a2530'}`,
               cursor: canInvade ? 'pointer' : 'not-allowed',
             }}
           >
@@ -396,14 +457,14 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       {isInvadable && invadeMode && (
         <>
           {divider}
-          <div style={{ fontSize: 11, color: '#5a7a8a', marginBottom: 4 }}>
+          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
             Drafting invasion force: {draftedSoFar} troops
           </div>
-          <div style={{ fontSize: 11, color: '#7a9aaa', marginBottom: 8 }}>
+          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
             Only adjacent tiles can contribute troops.
           </div>
           {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 11, color: '#c0c8d0' }}>
+            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
               {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
             </div>
           ))}
@@ -424,7 +485,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
                 }
               }}
               style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12,
+                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
                 background: draftedSoFar >= invadeTroopMin ? '#1e4a2a' : '#0f1923',
                 color: draftedSoFar >= invadeTroopMin ? '#80cc90' : '#3a5060',
                 border: `1px solid ${draftedSoFar >= invadeTroopMin ? '#2a6a3a' : '#1a2530'}`,
@@ -433,7 +494,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
             >Confirm</button>
             <button
               onClick={() => { setInvadeMode(false); setDraftModeActive(false); setInvadeModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 12, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
+              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
             >Cancel</button>
           </div>
         </>

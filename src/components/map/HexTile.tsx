@@ -1,11 +1,19 @@
-import { hexCorners } from '../../engine/hex';
+import { hexCorners, hexNeighbors, coordKey } from '../../engine/hex';
 import { useUIStore } from '../../store/uiStore';
-import type { Tile, PixelCoord, TraitVector, Policy } from '../../types';
+import type { Tile, PixelCoord, TraitVector, Policy, TerrainType, LandTile } from '../../types';
 import { DEFAULT_CONFIG } from '../../config';
 import { PLAYER_COLORS } from './playerColors';
 
+const TERRAIN_TINT: Record<TerrainType, string> = {
+  plains:  '#8aaa6a',
+  forest:  '#5a7a52',
+  hills:   '#97976d',
+  desert:  '#ddc1a5',
+  coast:   '#6a8a82',
+};
+
 const TILE_FILL: Record<Tile['state'], string> = {
-  water:     '#4a5fa3',
+  water:     '#687cbe',
   unclaimed: '#c8b89a',
   barbarian: '#a05c3b',
   owned:     '#7a9e5f', // fallback; playerIndex overrides this
@@ -15,7 +23,7 @@ const OVERLAY_COLORS: Record<keyof TraitVector, [string, string]> = {
   ecology:       ['#1E3A12', '#66FF00'],
   militarism:    ['#3A0A0A', '#FF1010'],
   religion:      ['#3A2A00', '#FFD700'],
-  liberty:       ['#3A1800', '#FF7A00'],
+  individualism: ['#3A1800', '#FF7A00'],
   progress:      ['#1E0A30', '#CC00FF'],
 };
 
@@ -58,6 +66,34 @@ function darkenColor(hex: string, factor: number): string {
   return `#${r.toString(16).padStart(2, '0')}${g.toString(16).padStart(2, '0')}${b.toString(16).padStart(2, '0')}`;
 }
 
+function blendedTerrainTint(tile: Tile, tiles: Record<string, Tile> | undefined): string {
+  if (tile.state === 'water') return TILE_FILL['water'];
+  const landTile = tile as LandTile;
+  const ownTint = TERRAIN_TINT[landTile.terrainType];
+  if (!tiles) return ownTint;
+
+  const neighbors = hexNeighbors(landTile.coord);
+  let totalWeight = 2;
+  let r = parseInt(ownTint.slice(1, 3), 16) * 2;
+  let g = parseInt(ownTint.slice(3, 5), 16) * 2;
+  let b = parseInt(ownTint.slice(5, 7), 16) * 2;
+
+  for (const neighborCoord of neighbors) {
+    const neighbor = tiles[coordKey(neighborCoord)];
+    if (!neighbor || neighbor.state === 'water') continue;
+    const neighborTint = TERRAIN_TINT[(neighbor as LandTile).terrainType];
+    r += parseInt(neighborTint.slice(1, 3), 16);
+    g += parseInt(neighborTint.slice(3, 5), 16);
+    b += parseInt(neighborTint.slice(5, 7), 16);
+    totalWeight += 1;
+  }
+
+  const fr = Math.round(r / totalWeight);
+  const fg = Math.round(g / totalWeight);
+  const fb = Math.round(b / totalWeight);
+  return `#${fr.toString(16).padStart(2, '0')}${fg.toString(16).padStart(2, '0')}${fb.toString(16).padStart(2, '0')}`;
+}
+
 interface HexTileProps {
   tile: Tile;
   center: PixelCoord;
@@ -67,10 +103,11 @@ interface HexTileProps {
   isAnnexTarget?: boolean;
   activePolicy?: Policy;
   humanPlayerId?: string;
+  tiles?: Record<string, Tile>;
   onClick?: () => void;
 }
 
-export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, activePolicy, humanPlayerId, onClick }: HexTileProps) {
+export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, activePolicy, humanPlayerId, tiles, onClick }: HexTileProps) {
   const activeOverlay      = useUIStore((state) => state.activeOverlay);
   const policyHoverChoice  = useUIStore((state) => state.policyHoverChoice);
 
@@ -92,18 +129,23 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
     const trait = activeOverlay.trait as keyof TraitVector;
     const { inverted } = activeOverlay;
     const [low, high] = OVERLAY_COLORS[trait];
-    const t = inverted ? 1 - tile.cultureVector[trait] : tile.cultureVector[trait];
+    const raw = (tile.cultureVector[trait] + 1) / 2;
+    const t = inverted ? 1 - raw : raw;
     fill = lerpColor(low, high, t);
   } else if (tile.state === 'owned' && playerIndex !== undefined) {
-    fill = PLAYER_COLORS[playerIndex % PLAYER_COLORS.length];
+    fill = lerpColor(PLAYER_COLORS[playerIndex % PLAYER_COLORS.length], blendedTerrainTint(tile, tiles), 0.35);
+  } else if (tile.state !== 'water') {
+    fill = blendedTerrainTint(tile, tiles);
   } else {
-    fill = TILE_FILL[tile.state];
+    fill = TILE_FILL['water'];
   }
 
   if (isDraftSource) { fill = '#5a9ecc'; }
   if (tile.state === 'owned' && tile.activeTroops > 0) { fill = darkenColor(fill, 0.85); }
-  if (tile.state === 'barbarian') {
-    fill = tile.activeTroops >= 1 ? '#a05c3b' : '#c8a882';
+  if (activeOverlay === null && tile.state === 'barbarian') {
+    const base = blendedTerrainTint(tile, tiles);
+    fill = lerpColor(base, '#e7b197', 0.80);
+    if (tile.activeTroops >= 1) fill = lerpColor(fill, '#000000', 0.15);
   }
 
   let loyaltyOverlayColor: string | null = null;
@@ -136,9 +178,14 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
     el.id = 'hex-pulse-styles';
     el.textContent =
       '@keyframes annexPulse { 0% { opacity: 0 } 50% { opacity: 0.5 } 100% { opacity: 0 } }' +
-      '@keyframes loyaltyPulse { 0% { opacity: 0 } 50% { opacity: 0.45 } 100% { opacity: 0 } }';
+      '@keyframes loyaltyPulse { 0% { opacity: 0 } 50% { opacity: 0.45 } 100% { opacity: 0 } }' +
+      '@keyframes borderPulse { 0% { stroke-opacity: 0.15 } 50% { stroke-opacity: 0.65 } 100% { stroke-opacity: 0.15 } }';
     document.head.appendChild(el);
   }
+
+  const terrainFilter = tile.state !== 'water'
+    ? `url(#terrain-${tile.terrainType})`
+    : undefined;
 
   return (
     <>
@@ -146,6 +193,7 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
         points={points}
         fill={fill}
         fillOpacity={fillOpacity}
+        filter={terrainFilter}
         onClick={onClick}
         style={onClick ? { cursor: 'pointer' } : undefined}
       />

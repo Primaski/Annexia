@@ -24,6 +24,14 @@ import type { AxialCoord, ScreenState, TraitVector } from '../types';
  */
 export type MapOverlay = 'owner' | 'loyalty' | 'defense' | 'none';
 
+export interface ToastMessage {
+  id: string;
+  message: string;
+  x: number;
+  y: number;
+  variant: 'success' | 'error';
+}
+
 // ─── Store Shape ──────────────────────────────────────────────────────────────
 
 interface UIState {
@@ -86,6 +94,19 @@ interface UIState {
   setVetoResult: (result: { policyId: string; tribuneId: string; originalChoiceIndex: number; finalChoiceIndex: number }) => void;
   clearVetoResult: () => void;
 
+  // ── Toast Queue ───────────────────────────────────────────────────────────
+  toasts: ToastMessage[];
+  pushToast: (toast: Omit<ToastMessage, 'id'>) => void;
+  dismissToast: (id: string) => void;
+
+  // ── Action Button Flash ───────────────────────────────────────────────────
+  pendingActionFlash: boolean;
+  setPendingActionFlash: (v: boolean) => void;
+
+  // ── Pending Right-Click Action ────────────────────────────────────────────
+  pendingRightClickAction: 'annex' | 'invade' | 'fortify' | null;
+  setPendingRightClickAction: (action: 'annex' | 'invade' | 'fortify' | null) => void;
+
   // ── Simulation ────────────────────────────────────────────────────────────
   simulationMode: boolean;
   simAutoAdvance: boolean;
@@ -133,6 +154,17 @@ export const useUIStore = create<UIState>((set) => ({
   draftClickKey: null,
   draftSources: {},
   vetoResult: null,
+  toasts: [],
+  pendingActionFlash: false,
+  pendingRightClickAction: null,
+
+  pushToast: (toast) =>
+    set((state) => ({
+      toasts: [...state.toasts, { ...toast, id: `toast_${Date.now()}_${Math.random().toString(36).slice(2, 6)}` }],
+    })),
+
+  dismissToast: (id) =>
+    set((state) => ({ toasts: state.toasts.filter((t) => t.id !== id) })),
 
   setSimulationMode: (simulationMode) => set({ simulationMode }),
   setSimAutoAdvance: (simAutoAdvance) => set({ simAutoAdvance }),
@@ -165,4 +197,8 @@ export const useUIStore = create<UIState>((set) => ({
   setVetoResult: (vetoResult) => set({ vetoResult }),
 
   clearVetoResult: () => set({ vetoResult: null }),
+
+  setPendingActionFlash: (pendingActionFlash) => set({ pendingActionFlash }),
+
+  setPendingRightClickAction: (pendingRightClickAction) => set({ pendingRightClickAction }),
 }));

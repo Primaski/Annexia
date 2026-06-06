@@ -3,12 +3,12 @@
     "id": "adv_steward_default",
     "name": "The Steward",
     "flavourText": "Democracies grant you more advisors. Autocracies exempt you from vetoes.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=av"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=d9oiuwbx"
   },
   {
     "id": "adv_steward_alt",
     "name": "The Consul",
     "flavourText": "I have no agenda here. Only observations.",
-    "imagePath": "https://api.dicebear.com/10.x/adventurer-neutral/svg?seed=a"
+    "imagePath": "https://api.dicebear.com/10.x/adventurer/svg?seed=a"
   }
 ]

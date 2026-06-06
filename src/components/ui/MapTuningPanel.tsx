@@ -45,7 +45,7 @@ export function MapTuningPanel({ config, onChange }: Props) {
       </div>
 
       {SLIDERS.map(({ key, label, min, max, step }) => {
-        const value = config[key];
+        const value = config[key] as number;
         const display = step >= 1 ? String(value) : value.toFixed(2);
         return (
           <div key={key} style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

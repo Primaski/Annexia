@@ -2,6 +2,8 @@ import type { Policy, Player, Tribune, Tile, OwnedTile, TraitVector, GovernmentT
 import type { TuningConfig } from '../config';
 import { coordKey } from './hex';
 
+//alt tribune env: itjyfsfa
+
 function clamp(value: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, value));
 }

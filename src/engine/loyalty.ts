@@ -12,7 +12,7 @@ import type { TuningConfig } from '../config';
 export const SPAWN_LOYALTY = 0.3;
 
 const TRAIT_KEYS: (keyof TraitVector)[] = [
-  'ecology', 'militarism', 'religion', 'liberty', 'progress',
+  'ecology', 'militarism', 'religion', 'individualism', 'progress',
 ];
 
 function clamp(value: number, min: number, max: number): number {

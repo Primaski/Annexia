@@ -27,15 +27,15 @@ function EffectIcon({ group }: { group: EffectGroup }) {
     >
       <div
         style={{
-          width: 32,
-          height: 32,
+          width: 44,
+          height: 44,
           borderRadius: 6,
           background: '#1a2a35',
           border: isEnabled ? '1px solid #2a3f50' : '1px solid #7a2020',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
-          fontSize: 16,
+          fontSize: 22,
           cursor: 'default',
           opacity: isEnabled ? 1 : 0.4,
           position: 'relative',
@@ -66,9 +66,9 @@ function EffectIcon({ group }: { group: EffectGroup }) {
             background: '#2a3f50',
             border: '1px solid #0f1923',
             borderRadius: 999,
-            width: 16,
-            height: 16,
-            fontSize: 9,
+            width: 20,
+            height: 20,
+            fontSize: 14,
             color: '#c0c8d0',
             display: 'flex',
             alignItems: 'center',
@@ -101,18 +101,18 @@ function EffectIcon({ group }: { group: EffectGroup }) {
             alignItems: 'center',
           }}
         >
-          <div style={{ fontSize: 13, color: '#e0e8f0', fontWeight: 'bold', textAlign: 'center' }}>
+          <div style={{ fontSize: 16, color: '#e0e8f0', fontWeight: 'bold', textAlign: 'center' }}>
             {representative.title}
           </div>
           <img src={effectTypeImage(representative.type)} alt={representative.type} width={48} height={48} />
-          <div style={{ fontSize: 11, color: '#c0c8d0', textAlign: 'center', wordBreak: 'break-word' }}>
+          <div style={{ fontSize: 14, color: '#c0c8d0', textAlign: 'center', wordBreak: 'break-word' }}>
             {representative.description}
           </div>
           <hr style={{ width: '100%', border: 'none', borderTop: '1px solid #2a3f50', margin: '2px 0' }} />
           {effects.map((effect) => (
             <div
               key={effect.id}
-              style={{ fontSize: 11, color: effect.enabled ? '#8aa0b0' : '#c0392b' }}
+              style={{ fontSize: 14, color: effect.enabled ? '#8aa0b0' : '#c0392b' }}
             >
               {formatMechanical(effect)} · {effect.enabled
                 ? (effect.turnsRemaining === null ? 'permanent' : `${effect.turnsRemaining} turns remaining`)

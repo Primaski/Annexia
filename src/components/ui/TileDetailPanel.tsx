@@ -77,7 +77,7 @@ export function TileDetailPanel() {
     border: '1px solid #2a3f50',
     padding: 16,
     fontFamily: 'monospace',
-    fontSize: 12,
+    fontSize: 18,
     color: '#c0c8d0',
     boxSizing: 'border-box',
   };
@@ -107,20 +107,20 @@ export function TileDetailPanel() {
       >
         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
           {tile.state === 'barbarian' && (
-            <Sprite size={40} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={headerNationName ?? 'Unknown'} />
+            <Sprite size={72} zoom={1.2} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={headerNationName ?? 'Unknown'} />
           )}
           {tile.state === 'owned' && (
-            <Sprite size={40} imagePath={headerPlayer?.imagePath ?? null} name={headerPlayer?.name ?? '?'} />
+            <Sprite size={72} zoom={1.2} imagePath={headerPlayer?.imagePath ?? null} name={headerPlayer?.name ?? '?'} />
           )}
           <div>
-            <div style={{ fontSize: 16, color: '#e0e8f0' }}>
+            <div style={{ fontSize: 20, color: '#e0e8f0' }}>
               {tile.state === 'unclaimed'
                 ? tile.name
                 : tile.state === 'barbarian'
                   ? `${headerNationName ?? 'Unknown'} (barbarian)`
                   : (headerNationName ?? 'Unknown')}
             </div>
-            <div style={{ fontSize: 12, color: '#3a5a6a', marginTop: 2 }}>
+            <div style={{ fontSize: 14, color: '#3a5a6a', marginTop: 2 }}>
               [{tile.coord.q}, {tile.coord.r}]
             </div>
           </div>

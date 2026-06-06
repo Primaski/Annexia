@@ -28,7 +28,7 @@ function CardChip({ effect }: { effect: EffectPreview }) {
           border: '1px solid #2a3f50',
           borderRadius: 4,
           padding: '2px 6px',
-          fontSize: 13,
+          fontSize: 16,
           color: '#c0c8d0',
         }}
       >
@@ -87,6 +87,8 @@ export function PolicyPanel() {
   const vetoResult               = useUIStore((state) => state.vetoResult);
   const clearVetoResult          = useUIStore((state) => state.clearVetoResult);
   const setPolicyHoverChoice     = useUIStore((state) => state.setPolicyHoverChoice);
+  const policyHoverChoice        = useUIStore((state) => state.policyHoverChoice);
+  const [hoveredButton, setHoveredButton] = useState<number | null>(null);
 
   const viewingPlayerId = useUIStore((state) => state.viewingPlayerId);
   const humanPlayer = players.find((p) => p.id === viewingPlayerId);
@@ -118,7 +120,7 @@ export function PolicyPanel() {
         <div style={{ fontSize: 26, color: '#c93b3b', letterSpacing: '0.15em' }}>VETOED</div>
         {vetoingTribune && (
           <>
-            <Sprite imagePath={vetoingTribune.imagePath} name={vetoingTribune.name} size={64} />
+            <Sprite imagePath={vetoingTribune.imagePath} name={vetoingTribune.name} size={96} zoom={1.2} expression="frown" />
             <div style={{ fontSize: 14, color: '#8aa0b0' }}>{vetoingTribune.name}</div>
           </>
         )}
@@ -153,9 +155,9 @@ export function PolicyPanel() {
         Policy — Card {currentPolicyCardIndex + 1} of {activePolicyCards.length}
       </div>
 
-      <div style={{ fontSize: 18, color: '#e0e8f0' }}>{policy.title}</div>
+      <div style={{ fontSize: 24, color: '#e8f0ff', letterSpacing: '0.04em', fontWeight: 'bold' }}>{policy.title}</div>
 
-      <div style={{ fontSize: 14, lineHeight: 1.5, color: '#c0c8d0' }}>{policy.description}</div>
+      <div style={{ fontSize: 18, lineHeight: 1.5, color: '#c0c8d0' }}>{policy.description}</div>
 
       {reactionStrip.length > 0 && (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -163,27 +165,38 @@ export function PolicyPanel() {
             const bias = computeInlineBias(tribune, policy);
             const flavor = policy.tribuneReactions?.[tribune.id]?.flavor
               ?? (bias >= 0 ? tribune.agreeText : tribune.disagreeText);
+            const expression =
+              policyHoverChoice === null
+                ? (bias >= 0 ? 'smile' : 'frown')
+                : policyHoverChoice === 0
+                  ? (bias >= 0 ? 'smile-big' : 'frown-big')
+                  : (bias >= 0 ? 'frown-big' : 'smile-big');
             return (
               <div
                 key={tribune.id}
                 style={{ display: 'flex', alignItems: 'center', gap: 10 }}
               >
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4, flexShrink: 0 }}>
-                  <Sprite imagePath={tribune.imagePath} name={tribune.name} size={40} />
-                  <div style={{ fontSize: 12, color: '#5a7a8a' }}>{tribune.name}</div>
+                  <Sprite imagePath={tribune.imagePath} name={tribune.name} size={128} zoom={1.2} expression={expression as 'smile' | 'smile-big' | 'frown' | 'frown-big'} />
                 </div>
                 <div
                   style={{
                     flex: 1,
-                    background: '#1e2d3a',
-                    border: '1px solid #2a3f50',
+                    background: bias >= 0 ? '#0d2b1a' : '#2b0d0d',
+                    borderLeft: bias >= 0 ? '3px solid #1a6b3a' : '3px solid #6b1a1a',
+                    borderTop: '1px solid #2a3f50',
+                    borderRight: '1px solid #2a3f50',
+                    borderBottom: '1px solid #2a3f50',
                     padding: '6px 10px',
                     fontFamily: 'monospace',
-                    fontSize: 14,
+                    fontSize: 20,
                     color: '#c0c8d0',
                   }}
                 >
                   {flavor}
+                  <div style={{ fontSize: 13, color: '#5a7a8a', marginTop: 6, textAlign: 'right' }}>
+                    — {tribune.name}
+                  </div>
                 </div>
               </div>
             );
@@ -198,19 +211,22 @@ export function PolicyPanel() {
             <button
               key={index}
               onClick={() => submitPolicyChoice(index)}
-              onMouseEnter={() => setPolicyHoverChoice(index as 0 | 1)}
-              onMouseLeave={() => setPolicyHoverChoice(null)}
+              onMouseEnter={() => { setPolicyHoverChoice(index as 0 | 1); setHoveredButton(index); }}
+              onMouseLeave={() => { setPolicyHoverChoice(null); setHoveredButton(null); }}
               style={{
                 width: '100%',
-                padding: '8px 12px',
+                padding: '12px 16px',
                 fontFamily: 'monospace',
-                fontSize: 15,
-                background: '#1e2d3a',
-                color: '#c0c8d0',
+                fontSize: 22,
+                background: index === 0
+                  ? (hoveredButton === 0 ? '#174d2e' : '#0d2b1a')
+                  : (hoveredButton === 1 ? '#4d1717' : '#2b0d0d'),
+                color: hoveredButton === index ? '#ffffff' : '#c0c8d0',
                 border: '1px solid #2a3f50',
                 cursor: 'pointer',
                 textAlign: 'left',
                 height: 'auto',
+                transition: 'background 0.15s ease',
               }}
             >
               <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>

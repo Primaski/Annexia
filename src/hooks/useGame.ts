@@ -18,6 +18,14 @@ let simStepInProgress = false;
 
 export type RelocationEntry = { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' };
 
+export type ActionBlockedReason = 'no_ap' | 'no_troops' | 'no_adjacent_troops' | 'no_connected_troops';
+
+export interface AvailableAction {
+  type: 'annex' | 'invade' | 'fortify';
+  canAfford: boolean;
+  blockedReason?: ActionBlockedReason;
+}
+
 export function getMilitarySpentByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const e of relocatedTroops) {
@@ -51,7 +59,7 @@ const DEMOCRATIC_LEANS: Record<keyof TraitVector, number> = {
   ecology: 0.3,
   militarism: -0.8,
   religion: -0.5,
-  liberty: 0.9,
+  individualism: 0.9,
   progress: 0.4,
 };
 const TOTAL_ABS_LEAN = 2.9;
@@ -61,7 +69,7 @@ function deriveGovernmentType(traitVector: TraitVector): GovernmentType {
     (traitVector.ecology * DEMOCRATIC_LEANS.ecology +
       traitVector.militarism * DEMOCRATIC_LEANS.militarism +
       traitVector.religion * DEMOCRATIC_LEANS.religion +
-      traitVector.liberty * DEMOCRATIC_LEANS.liberty +
+      traitVector.individualism * DEMOCRATIC_LEANS.individualism +
       traitVector.progress * DEMOCRATIC_LEANS.progress) /
     TOTAL_ABS_LEAN;
   if (score > 0.15) return 'democracy';
@@ -120,8 +128,8 @@ export function useMapGen(): void {
           id: `player_${i + 1}`,
           name: `Player ${i + 1}`,
           isHuman: true,
-          traitVector: { ecology: 0, militarism: 0, religion: 0, liberty: 0, progress: 0 },
-          alignmentVector: { ecology: 0, militarism: 0, religion: 0, liberty: 0, progress: 0 },
+          traitVector: { ecology: 0, militarism: 0, religion: 0, individualism: 0, progress: 0 },
+          alignmentVector: { ecology: 0, militarism: 0, religion: 0, individualism: 0, progress: 0 },
           confidence: 0.5,
           governmentType: 'none' as GovernmentType,
           advisorId: null,
@@ -236,6 +244,7 @@ export function useMapGen(): void {
           ...base,
           state: 'owned',
           ownerId,
+          nationId: `nation_player_${i}`,
           loyalty: SPAWN_LOYALTY,
           loyaltyTarget: SPAWN_LOYALTY,
           suppression: 0,
@@ -802,6 +811,7 @@ export function resolveTurn(): void {
       updatedTiles[key] = {
         coord: tile.coord,
         state: 'barbarian',
+        terrainType: (tile as OwnedTile).terrainType,
         cultureVector: tile.cultureVector,
         name: tile.name,
         nationId,
@@ -912,4 +922,92 @@ export function resolveTurn(): void {
       .filter((e) => e.turnsRemaining === null || e.turnsRemaining > 0);
     useGameStore.getState().updatePlayer(player.id, { activeEffects: ticked });
   }
+}
+
+export function getAvailableActionsForTile(
+  tileKey: string,
+  tiles: Record<string, Tile>,
+  viewingPlayerId: string,
+  actionsRemaining: number,
+  spentTroopsByTile: Record<string, number>,
+  relocatedTroops: RelocationEntry[],
+  mapCols: number,
+  mapRows: number,
+): AvailableAction[] {
+  const tile = tiles[tileKey];
+  if (!tile || tile.state === 'water') return [];
+
+  const actions: AvailableAction[] = [];
+
+  if (tile.state === 'unclaimed') {
+    const annexable = getAnnexableTiles(tiles, viewingPlayerId, mapCols, mapRows);
+    if (!annexable.has(tileKey)) return [];
+
+    let totalAvailableTroops = 0;
+    for (const [k, t] of Object.entries(tiles)) {
+      if (t.state !== 'owned' || (t as OwnedTile).ownerId !== viewingPlayerId) continue;
+      totalAvailableTroops += Math.max(0, (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0));
+    }
+
+    if (actionsRemaining < DEFAULT_CONFIG.mobilization.annexAPCost) {
+      actions.push({ type: 'annex', canAfford: false, blockedReason: 'no_ap' });
+    } else if (totalAvailableTroops < DEFAULT_CONFIG.mobilization.annexTroopMin) {
+      actions.push({ type: 'annex', canAfford: false, blockedReason: 'no_troops' });
+    } else {
+      actions.push({ type: 'annex', canAfford: true });
+    }
+    return actions;
+  }
+
+  if (tile.state === 'barbarian') {
+    const invadable = getInvadableTileKeys(tiles, viewingPlayerId, mapCols, mapRows);
+    if (!invadable.has(tileKey)) return [];
+
+    const receivedPassiveByTile = getReceivedPassiveByTile(relocatedTroops);
+
+    let adjacentAvailableTroops = 0;
+    for (const neighborCoord of hexNeighbors(parseCoordKey(tileKey))) {
+      const k = coordKey(neighborCoord);
+      const neighbor = tiles[k];
+      if (!neighbor || neighbor.state !== 'owned' || (neighbor as OwnedTile).ownerId !== viewingPlayerId) continue;
+      adjacentAvailableTroops += Math.max(
+        0,
+        (neighbor as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) - (receivedPassiveByTile[k] ?? 0),
+      );
+    }
+
+    if (actionsRemaining < DEFAULT_CONFIG.mobilization.invadeAPCost) {
+      actions.push({ type: 'invade', canAfford: false, blockedReason: 'no_ap' });
+    } else if (adjacentAvailableTroops < DEFAULT_CONFIG.mobilization.invadeTroopMin) {
+      actions.push({ type: 'invade', canAfford: false, blockedReason: 'no_adjacent_troops' });
+    } else {
+      actions.push({ type: 'invade', canAfford: true });
+    }
+    return actions;
+  }
+
+  if (tile.state === 'owned' && (tile as OwnedTile).ownerId === viewingPlayerId) {
+    const receivedPassiveByTile = getReceivedPassiveByTile(relocatedTroops);
+
+    let connectedAvailableTroops = 0;
+    for (const [k, t] of Object.entries(tiles)) {
+      if (k === tileKey) continue;
+      if (t.state !== 'owned' || (t as OwnedTile).ownerId !== viewingPlayerId) continue;
+      connectedAvailableTroops += Math.max(
+        0,
+        (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) - (receivedPassiveByTile[k] ?? 0),
+      );
+    }
+
+    if (actionsRemaining < DEFAULT_CONFIG.mobilization.fortifyAPCost) {
+      actions.push({ type: 'fortify', canAfford: false, blockedReason: 'no_ap' });
+    } else if (connectedAvailableTroops === 0) {
+      actions.push({ type: 'fortify', canAfford: false, blockedReason: 'no_connected_troops' });
+    } else {
+      actions.push({ type: 'fortify', canAfford: true });
+    }
+    return actions;
+  }
+
+  return [];
 }

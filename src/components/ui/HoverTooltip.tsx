@@ -8,7 +8,7 @@ const TRAITS: { key: keyof TraitVector; posEmoji: string; negEmoji: string }[] =
   { key: 'ecology',    posEmoji: '🌱', negEmoji: '🏭' },
   { key: 'militarism', posEmoji: '⚔️', negEmoji: '☮️' },
   { key: 'religion',   posEmoji: '⛪', negEmoji: '⚛️' },
-  { key: 'liberty',    posEmoji: '🗽', negEmoji: '🤝' },
+  { key: 'individualism', posEmoji: '🗽', negEmoji: '🤝' },
   { key: 'progress',   posEmoji: '🚀', negEmoji: '⛩️' },
 ];
 
@@ -18,11 +18,11 @@ const baseStyle: React.CSSProperties = {
   border: '1px solid #2a3f50',
   padding: '8px 12px',
   fontFamily: 'monospace',
-  fontSize: 12,
+  fontSize: 16,
   color: '#c0c8d0',
   pointerEvents: 'none',
   zIndex: 50,
-  minWidth: 140,
+  minWidth: 200,
 };
 
 export function HoverTooltip() {
@@ -60,7 +60,7 @@ export function HoverTooltip() {
   if (tile.state === 'unclaimed') {
     return (
       <div style={style}>
-        <div style={{ fontSize: 14, color: '#e0e8f0', marginBottom: 2 }}>{tile.name}</div>
+        <div style={{ fontSize: 20, color: '#e0e8f0', marginBottom: 2 }}>{tile.name}</div>
         <div>unclaimed</div>
         {dominantEmojis.length > 0 && <div>{dominantEmojis.join('')}</div>}
       </div>
@@ -73,8 +73,8 @@ export function HoverTooltip() {
     return (
       <div style={style}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <Sprite size={28} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={nationName} />
-          <div style={{ fontSize: 16, color: '#e0e8f0' }}>{nationName} (barbarian)</div>
+          <Sprite size={48} zoom={1.2} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={nationName} />
+          <div style={{ fontSize: 20, color: '#e0e8f0' }}>{nationName} 🗿</div>
         </div>
         <div style={{ marginBottom: 6 }}>🏡 {tile.name}</div>
         <div>⚔️ {tile.activeTroops}</div>
@@ -90,10 +90,10 @@ export function HoverTooltip() {
   return (
     <div style={style}>
       <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-        <Sprite size={28} imagePath={player?.imagePath ?? null} name={player?.name ?? '?'} />
-        <div style={{ fontSize: 16, color: '#e0e8f0' }}>{nationName}</div>
+        <Sprite size={48} zoom={1.2} imagePath={player?.imagePath ?? null} name={player?.name ?? '?'} />
+        <div style={{ fontSize: 20, color: '#e0e8f0' }}>{nationName}</div>
       </div>
-      <div style={{ marginBottom: 6 }}>🏡 {tile.name}</div>
+      <div style={{ marginBottom: 6 }}>🏛️ {tile.name}</div>
       {/* TODO: [REDACT in multiplayer] hide troop count for enemy tiles */}
       <div>⚔️ {tile.activeTroops}</div>
       {/* TODO: [REDACT in multiplayer] hide loyalty for enemy tiles unless an intel effect is active */}

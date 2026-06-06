@@ -5,18 +5,11 @@ import { coordKey, hexNeighbors, hexCorners } from '../../engine/hex';
 import { useMapLayout } from '../../hooks/useMapLayout';
 import { HexTile } from './HexTile';
 import { PLAYER_COLORS } from './playerColors';
+import { getAvailableActionsForTile } from '../../hooks/useGame';
 import type { Tile, OwnedTile, Policy } from '../../types';
 
 const SQ3 = Math.sqrt(3);
 const PAD = 8;
-
-function darkenHex(hex: string, factor: number): string {
-  const r = Math.round(parseInt(hex.slice(1, 3), 16) * factor);
-  const g = Math.round(parseInt(hex.slice(3, 5), 16) * factor);
-  const b = Math.round(parseInt(hex.slice(5, 7), 16) * factor);
-  const clamp = (n: number) => Math.min(255, Math.max(0, n));
-  return `#${clamp(r).toString(16).padStart(2, '0')}${clamp(g).toString(16).padStart(2, '0')}${clamp(b).toString(16).padStart(2, '0')}`;
-}
 
 // Maps each of the 6 neighbor directions (matching AXIAL_DIRECTIONS order in hex.ts)
 // to the pair of hexCorners indices that form that edge.
@@ -38,15 +31,20 @@ export function HexGrid() {
   const mapCols           = useGameStore((state) => state.config.mapCols);
   const mapRows           = useGameStore((state) => state.config.mapRows);
   const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
-  const selectTile         = useUIStore((state) => state.selectTile);
-  const setHoveredTile     = useUIStore((state) => state.setHoveredTile);
-  const setTooltipPosition = useUIStore((state) => state.setTooltipPosition);
-  const draftModeActive    = useUIStore((state) => state.draftModeActive);
-  const invadeModeActive   = useUIStore((state) => state.invadeModeActive);
-  const draftSources       = useUIStore((state) => state.draftSources);
-  const setDraftClickKey   = useUIStore((state) => state.setDraftClickKey);
-  const selectedTileCoord  = useUIStore((state) => state.selectedTileCoord);
-  const viewingPlayerId = useUIStore((state) => state.viewingPlayerId);
+  const selectTile            = useUIStore((state) => state.selectTile);
+  const setHoveredTile        = useUIStore((state) => state.setHoveredTile);
+  const setTooltipPosition    = useUIStore((state) => state.setTooltipPosition);
+  const draftModeActive       = useUIStore((state) => state.draftModeActive);
+  const invadeModeActive      = useUIStore((state) => state.invadeModeActive);
+  const draftSources          = useUIStore((state) => state.draftSources);
+  const setDraftClickKey      = useUIStore((state) => state.setDraftClickKey);
+  const selectedTileCoord     = useUIStore((state) => state.selectedTileCoord);
+  const viewingPlayerId       = useUIStore((state) => state.viewingPlayerId);
+  const pushToast             = useUIStore((state) => state.pushToast);
+  const setPendingRightClickAction = useUIStore((state) => state.setPendingRightClickAction);
+  const setPendingActionFlash = useUIStore((state) => state.setPendingActionFlash);
+  const actionsRemaining      = useGameStore((state) => state.actionsRemaining);
+  const relocatedTroops       = useGameStore((state) => state.relocatedTroops);
   const humanPlayer = players.find((p) => p.id === viewingPlayerId);
 
   const containerRef = useRef<HTMLDivElement>(null);
@@ -153,6 +151,38 @@ export function HexGrid() {
       }}
     >
     <svg width={svgWidth} height={svgHeight} style={{ display: 'block' }}>
+      <defs>
+        <filter id="terrain-plains" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.9" numOctaves="2" seed="1" result="noise"/>
+          <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+          <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended"/>
+          <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+        </filter>
+        <filter id="terrain-forest" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.45" numOctaves="4" seed="2" result="noise"/>
+          <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+          <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended"/>
+          <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+        </filter>
+        <filter id="terrain-hills" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="turbulence" baseFrequency="0.55" numOctaves="3" seed="3" result="noise"/>
+          <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+          <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended"/>
+          <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+        </filter>
+        <filter id="terrain-desert" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.25" numOctaves="2" seed="4" result="noise"/>
+          <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+          <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended"/>
+          <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+        </filter>
+        <filter id="terrain-coast" x="-10%" y="-10%" width="120%" height="120%">
+          <feTurbulence type="fractalNoise" baseFrequency="0.5" numOctaves="2" seed="5" result="noise"/>
+          <feColorMatrix type="saturate" values="0" in="noise" result="grey"/>
+          <feBlend in="SourceGraphic" in2="grey" mode="multiply" result="blended"/>
+          <feComposite in="blended" in2="SourceGraphic" operator="in"/>
+        </filter>
+      </defs>
       <g transform={`translate(${xOffset},${yOffset})`}>
         {/* Layer 1: tile fills */}
         {tileList.map((tile) => {
@@ -172,12 +202,61 @@ export function HexGrid() {
               onMouseEnter={(e) => { setHoveredTile(tile.coord); setTooltipPosition({ x: e.clientX, y: e.clientY }); }}
               onMouseMove={(e) => setTooltipPosition({ x: e.clientX, y: e.clientY })}
               onMouseLeave={() => setHoveredTile(null)}
+              onContextMenu={(e) => {
+                e.preventDefault();
+                if (phase !== 'mobilization') return;
+                if (!viewingPlayerId) return;
+
+                const actions = getAvailableActionsForTile(
+                  tKey,
+                  tiles,
+                  viewingPlayerId,
+                  actionsRemaining,
+                  spentTroopsByTile,
+                  relocatedTroops,
+                  mapCols,
+                  mapRows,
+                );
+
+                if (actions.length === 0) return;
+
+                const action = actions[0];
+
+                selectTile(tile.coord);
+
+                if (!action.canAfford) {
+                  const reasonLabel: Record<string, string> = {
+                    no_ap:               'Not enough AP',
+                    no_troops:           'No troops available',
+                    no_adjacent_troops:  'No adjacent troops',
+                    no_connected_troops: 'No connected troops',
+                  };
+                  pushToast({
+                    message: reasonLabel[action.blockedReason ?? 'no_ap'],
+                    x: e.clientX,
+                    y: e.clientY,
+                    variant: 'error',
+                  });
+                  setPendingActionFlash(true);
+                  return;
+                }
+
+                pushToast({
+                  message: action.type.toUpperCase(),
+                  x: e.clientX,
+                  y: e.clientY,
+                  variant: 'success',
+                });
+
+                setPendingRightClickAction(action.type);
+              }}
             >
               <HexTile
                 tile={tile}
                 center={getPixel(tile.coord)}
                 size={hexSize}
                 playerIndex={tile.state === 'owned' ? playerIndexById.get(tile.ownerId) : undefined}
+                tiles={tiles}
                 isDraftSource={isDraftSource}
                 isAnnexTarget={isAnnexTarget}
                 activePolicy={activePolicy}
@@ -201,9 +280,7 @@ export function HexGrid() {
           const center  = getPixel(tile.coord);
           const corners = hexCorners(center, hexSize);
           const neighbors = hexNeighbors(tile.coord);
-          const stroke = tile.state === 'owned'
-            ? darkenHex(PLAYER_COLORS[(playerIndexById.get(tile.ownerId) ?? 0) % PLAYER_COLORS.length], 0.5)
-            : '#6B3A2A';
+          const tKey = coordKey(tile.coord);
 
           return DIRECTION_CORNERS.flatMap(([c1, c2], k) => {
             const neighbor = tiles[coordKey(neighbors[k])] as Tile | undefined;
@@ -217,18 +294,32 @@ export function HexGrid() {
 
             if (!draw) return [];
 
-            return (
-              <line
-                key={`${coordKey(tile.coord)}-${k}`}
-                x1={corners[c1].x.toFixed(2)}
-                y1={corners[c1].y.toFixed(2)}
-                x2={corners[c2].x.toFixed(2)}
-                y2={corners[c2].y.toFixed(2)}
-                stroke={stroke}
-                strokeWidth={3}
-                strokeLinecap="round"
-              />
-            );
+            const x1 = corners[c1].x.toFixed(2);
+            const y1 = corners[c1].y.toFixed(2);
+            const x2 = corners[c2].x.toFixed(2);
+            const y2 = corners[c2].y.toFixed(2);
+
+            if (tile.state === 'barbarian') {
+              return [
+                <line key={`${tKey}-${k}`}
+                  x1={x1} y1={y1} x2={x2} y2={y2}
+                  stroke='#6B3A2A' strokeWidth={2} strokeLinecap="round"
+                />
+              ];
+            }
+
+            const playerColor = PLAYER_COLORS[(playerIndexById.get(tile.ownerId) ?? 0) % PLAYER_COLORS.length];
+            return [
+              <line key={`${tKey}-${k}-base`}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={playerColor} strokeWidth={2.5} strokeOpacity={0.7} strokeLinecap="round"
+              />,
+              <line key={`${tKey}-${k}-pulse`}
+                x1={x1} y1={y1} x2={x2} y2={y2}
+                stroke={playerColor} strokeWidth={3.5} strokeLinecap="round"
+                style={{ animation: 'borderPulse 2.4s ease-in-out infinite', pointerEvents: 'none' }}
+              />,
+            ];
           });
         })}
       </g>
