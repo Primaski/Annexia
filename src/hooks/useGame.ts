@@ -26,19 +26,9 @@ export interface AvailableAction {
   blockedReason?: ActionBlockedReason;
 }
 
-export function getMilitarySpentByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
+export function getLockedArrivalsByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
   const result: Record<string, number> = {};
   for (const e of relocatedTroops) {
-    if (e.actionType !== 'military') continue;
-    result[e.fromKey] = (result[e.fromKey] ?? 0) + e.count;
-  }
-  return result;
-}
-
-export function getReceivedPassiveByTile(relocatedTroops: RelocationEntry[]): Record<string, number> {
-  const result: Record<string, number> = {};
-  for (const e of relocatedTroops) {
-    if (e.actionType !== 'passive') continue;
     result[e.toKey] = (result[e.toKey] ?? 0) + e.count;
   }
   return result;
@@ -110,7 +100,8 @@ export function useMapGen(): void {
     useGameStore.getState().setPhase('roundtable');
     const { config, setTiles, setPlayers, setMapSeed } = useGameStore.getState();
     const { mapCols, mapRows, playerCount } = config;
-    const seed = Date.now();
+    // DEBUG: fixed seed for reproducible map — remove this line and restore `Date.now()` when done
+    const seed = 1780856687763; // const seed = Date.now();
     const rand = mulberry32(seed);
 
     // Step 1: Generate terrain
@@ -249,7 +240,7 @@ export function useMapGen(): void {
           loyaltyTarget: SPAWN_LOYALTY,
           suppression: 0,
           defense: 0,
-          activeTroops: key === spawnKey ? DEFAULT_CONFIG.mobilization.spawnTroops : 0,
+          troops: key === spawnKey ? DEFAULT_CONFIG.mobilization.spawnTroops : 0,
         loyaltyLog: [],
         } as OwnedTile);
       }
@@ -487,11 +478,12 @@ export function startMobilizationPhase(): void {
 }
 
 export function getAnnexableTileKeys(): Set<string> {
-  const { tiles, players, config, spentTroopsByTile } = useGameStore.getState();
+  const { tiles, players, config } = useGameStore.getState();
   const viewingPlayerId = useUIStore.getState().viewingPlayerId;
   const human = players.find((p) => p.id === viewingPlayerId);
   if (!human) return new Set();
 
+  const lockedArrivalsByTile = getLockedArrivalsByTile(useGameStore.getState().relocatedTroops);
   const visited = new Set<string>();
   const result = new Set<string>();
 
@@ -503,7 +495,7 @@ export function getAnnexableTileKeys(): Set<string> {
     for (const k of region) visited.add(k);
 
     const hasAvailableTroops = [...region].some(
-      (k) => (tiles[k] as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) > 0,
+      (k) => (tiles[k] as OwnedTile).troops - (lockedArrivalsByTile[k] ?? 0) > 0,
     );
     if (!hasAvailableTroops) continue;
 
@@ -546,17 +538,12 @@ export function performInvade(targetKey: string, troopSources: Record<string, nu
     DEFAULT_CONFIG.combat.lanchesterExponent, DEFAULT_CONFIG.combat.defenderBonus, () => Math.random(),
   );
 
-  useGameStore.getState().setTiles(newTiles);
-
-  for (const [sourceKey, count] of Object.entries(troopSources)) {
-    useGameStore.getState().recordTroopRelocation({
-      fromKey: sourceKey,
-      toKey: targetKey,
-      count,
-      ownerId: human.id,
-      actionType: 'military',
-    });
-  }
+  useGameStore.setState((state) => {
+    const survivorRelocation = result.attackerWon
+      ? [{ fromKey: targetKey, toKey: targetKey, count: result.attackerSurvivors, ownerId: human.id, actionType: 'military' as const }]
+      : [];
+    return { tiles: newTiles, relocatedTroops: [...state.relocatedTroops, ...survivorRelocation] };
+  });
 
   useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.invadeAPCost);
 
@@ -595,15 +582,14 @@ export function performAnnex(targetKey: string, troopSources: Record<string, num
   }
 
   const updatedTiles = annexTile(state.tiles, targetKey, human.id, human.nationId!, troopSources);
-  useGameStore.getState().setTiles(updatedTiles);
   const totalMoved = Object.values(troopSources).reduce((a, b) => a + b, 0);
-  useGameStore.getState().recordTroopRelocation({
-    fromKey: targetKey,
-    toKey: targetKey,
-    count: totalMoved,
-    ownerId: human.id,
-    actionType: 'military',
-  });
+  useGameStore.setState((state) => ({
+    tiles: updatedTiles,
+    relocatedTroops: [
+      ...state.relocatedTroops,
+      { fromKey: targetKey, toKey: targetKey, count: totalMoved, ownerId: human.id, actionType: 'military' as const },
+    ],
+  }));
   useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.annexAPCost);
 }
 
@@ -625,16 +611,17 @@ export function performFortify(targetKey: string, troopSources: Record<string, n
   }
 
   const updatedTiles = fortifyTile(state.tiles, targetKey, human.id, troopSources);
-  useGameStore.getState().setTiles(updatedTiles);
-  for (const [sourceKey, count] of Object.entries(troopSources)) {
-    useGameStore.getState().recordTroopRelocation({
-      fromKey: sourceKey,
-      toKey: targetKey,
-      count,
-      ownerId: human.id,
-      actionType: 'passive',
-    });
-  }
+  const fortifyRelocations = Object.entries(troopSources).map(([sourceKey, count]) => ({
+    fromKey: sourceKey,
+    toKey: targetKey,
+    count,
+    ownerId: human.id,
+    actionType: 'passive' as const,
+  }));
+  useGameStore.setState((state) => ({
+    tiles: updatedTiles,
+    relocatedTroops: [...state.relocatedTroops, ...fortifyRelocations],
+  }));
   useGameStore.getState().spendAction(DEFAULT_CONFIG.mobilization.fortifyAPCost);
 }
 
@@ -672,12 +659,11 @@ export function performAIAnnex(): void {
     if (player.isHuman || !player.nationId) continue;
     const rand = mulberry32(Date.now() + i * 99991);
     let currentTiles = useGameStore.getState().tiles;
-    const localSpent: Record<string, number> = {};
     let apRemaining = DEFAULT_CONFIG.mobilization.startingAP;
     const annexable = Array.from(getAnnexableTiles(currentTiles, player.id, config.mapCols, config.mapRows));
 
     for (let attempt = 0; attempt < maxAttempts && annexable.length > 0; attempt++) {
-      const totalAvailable = getTotalAvailableTroops(currentTiles, player.id, localSpent);
+      const totalAvailable = getTotalAvailableTroops(currentTiles, player.id, getLockedArrivalsByTile([]));
       if (totalAvailable < DEFAULT_CONFIG.mobilization.annexTroopMin) break;
       if (apRemaining < DEFAULT_CONFIG.mobilization.annexAPCost) break;
 
@@ -696,7 +682,7 @@ export function performAIAnnex(): void {
         if (needed <= 0) break;
         if (!reachableRegion.has(key)) continue;
         if (tile.state !== 'owned' || (tile as OwnedTile).ownerId !== player.id) continue;
-        const available = (tile as OwnedTile).activeTroops - (localSpent[key] ?? 0);
+        const available = (tile as OwnedTile).troops;
         if (available <= 0) continue;
         const take = Math.min(available, needed);
         sources[key] = take;
@@ -706,9 +692,6 @@ export function performAIAnnex(): void {
 
       currentTiles = annexTile(currentTiles, targetKey, player.id, player.nationId, sources);
       console.log(`[DEBUG] ${player.name} annexes ${targetKey}`);
-      for (const [fromKey, count] of Object.entries(sources)) {
-        localSpent[fromKey] = (localSpent[fromKey] ?? 0) + count;
-      }
       apRemaining -= DEFAULT_CONFIG.mobilization.annexAPCost;
     }
     useGameStore.getState().setTiles(currentTiles);
@@ -716,6 +699,7 @@ export function performAIAnnex(): void {
 }
 
 export function endMobilizationPhase(): void {
+  useUIStore.getState().clearPendingAction();
   performAIAnnex();
   useGameStore.getState().advanceTurn();
 }
@@ -815,7 +799,7 @@ export function resolveTurn(): void {
         cultureVector: tile.cultureVector,
         name: tile.name,
         nationId,
-        activeTroops: Math.max(5, (tile as OwnedTile).activeTroops),
+        troops: Math.max(5, (tile as OwnedTile).troops),
         previousOwner: (tile as OwnedTile).ownerId,
       } as BarbarianTile;
     }
@@ -894,7 +878,7 @@ export function resolveTurn(): void {
 
         if (depositKey !== null) {
           const depositTile = updatedTiles[depositKey] as OwnedTile;
-          updatedTiles[depositKey] = { ...depositTile, activeTroops: depositTile.activeTroops + effect.magnitude };
+          updatedTiles[depositKey] = { ...depositTile, troops: depositTile.troops + effect.magnitude };
         }
       } else if (effect.type === 'budget_income') {
         updatedBudget += effect.magnitude;
@@ -929,7 +913,6 @@ export function getAvailableActionsForTile(
   tiles: Record<string, Tile>,
   viewingPlayerId: string,
   actionsRemaining: number,
-  spentTroopsByTile: Record<string, number>,
   relocatedTroops: RelocationEntry[],
   mapCols: number,
   mapRows: number,
@@ -937,6 +920,7 @@ export function getAvailableActionsForTile(
   const tile = tiles[tileKey];
   if (!tile || tile.state === 'water') return [];
 
+  const lockedArrivalsByTile = getLockedArrivalsByTile(relocatedTroops);
   const actions: AvailableAction[] = [];
 
   if (tile.state === 'unclaimed') {
@@ -946,7 +930,7 @@ export function getAvailableActionsForTile(
     let totalAvailableTroops = 0;
     for (const [k, t] of Object.entries(tiles)) {
       if (t.state !== 'owned' || (t as OwnedTile).ownerId !== viewingPlayerId) continue;
-      totalAvailableTroops += Math.max(0, (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0));
+      totalAvailableTroops += Math.max(0, (t as OwnedTile).troops - (lockedArrivalsByTile[k] ?? 0));
     }
 
     if (actionsRemaining < DEFAULT_CONFIG.mobilization.annexAPCost) {
@@ -963,8 +947,6 @@ export function getAvailableActionsForTile(
     const invadable = getInvadableTileKeys(tiles, viewingPlayerId, mapCols, mapRows);
     if (!invadable.has(tileKey)) return [];
 
-    const receivedPassiveByTile = getReceivedPassiveByTile(relocatedTroops);
-
     let adjacentAvailableTroops = 0;
     for (const neighborCoord of hexNeighbors(parseCoordKey(tileKey))) {
       const k = coordKey(neighborCoord);
@@ -972,7 +954,7 @@ export function getAvailableActionsForTile(
       if (!neighbor || neighbor.state !== 'owned' || (neighbor as OwnedTile).ownerId !== viewingPlayerId) continue;
       adjacentAvailableTroops += Math.max(
         0,
-        (neighbor as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) - (receivedPassiveByTile[k] ?? 0),
+        (neighbor as OwnedTile).troops - (lockedArrivalsByTile[k] ?? 0),
       );
     }
 
@@ -987,15 +969,13 @@ export function getAvailableActionsForTile(
   }
 
   if (tile.state === 'owned' && (tile as OwnedTile).ownerId === viewingPlayerId) {
-    const receivedPassiveByTile = getReceivedPassiveByTile(relocatedTroops);
-
     let connectedAvailableTroops = 0;
     for (const [k, t] of Object.entries(tiles)) {
       if (k === tileKey) continue;
       if (t.state !== 'owned' || (t as OwnedTile).ownerId !== viewingPlayerId) continue;
       connectedAvailableTroops += Math.max(
         0,
-        (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) - (receivedPassiveByTile[k] ?? 0),
+        (t as OwnedTile).troops - (lockedArrivalsByTile[k] ?? 0),
       );
     }
 

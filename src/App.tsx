@@ -8,7 +8,7 @@
  */
 
 import { useEffect } from 'react';
-import { useMapGen, startPolicyPhase, startMobilizationPhase, advanceSimStep } from './hooks/useGame';
+import { useMapGen, startPolicyPhase, startMobilizationPhase, advanceSimStep, getLockedArrivalsByTile } from './hooks/useGame';
 import { useUIStore } from './store/uiStore';
 import { useGameStore } from './store/gameStore';
 import { coordKey } from './engine/hex';
@@ -30,18 +30,17 @@ export default function App() {
   const actionsRemaining  = useGameStore((state) => state.actionsRemaining);
   const players           = useGameStore((state) => state.players);
   const tiles             = useGameStore((state) => state.tiles);
-  const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
+  const relocatedTroops = useGameStore((state) => state.relocatedTroops);
   const humanPlayer = players.find((p) => p.isHuman);
   const ownedHumanTiles = humanPlayer
     ? Object.values(tiles).filter((t): t is OwnedTile => t.state === 'owned' && (t as OwnedTile).ownerId === humanPlayer.id)
     : [];
-  const totalTroops = ownedHumanTiles.reduce((sum, t) => sum + t.activeTroops, 0);
-  const availableTroops = humanPlayer
-    ? ownedHumanTiles.reduce((sum, t) => {
-        const key = coordKey(t.coord);
-        return sum + Math.max(0, t.activeTroops - (spentTroopsByTile[key] ?? 0));
-      }, 0)
-    : 0;
+  const totalTroops = ownedHumanTiles.reduce((sum, t) => sum + t.troops, 0);
+  const lockedArrivalsByTile = getLockedArrivalsByTile(relocatedTroops);
+  const availableTroops = ownedHumanTiles.reduce((sum, t) => {
+    const key = coordKey(t.coord);
+    return sum + Math.max(0, t.troops - (lockedArrivalsByTile[key] ?? 0));
+  }, 0);
 
   useEffect(() => {
     if (phase === 'policy') {

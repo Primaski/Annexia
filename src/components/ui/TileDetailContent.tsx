@@ -1,10 +1,8 @@
-import { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useUIStore } from '../../store/uiStore';
 import { useGameStore } from '../../store/gameStore';
-import { coordKey, hexNeighbors } from '../../engine/hex';
 import { DEFAULT_CONFIG } from '../../config';
-import { getAnnexableTileKeys, performAnnex, performFortify, getInvadableTileKeysForPlayer, performInvade, getReceivedPassiveByTile } from '../../hooks/useGame';
-import type { TraitVector, OwnedTile, BarbarianTile } from '../../types';
+import type { TraitVector } from '../../types';
 import { Sprite } from './Sprite';
 
 const TRAITS: { key: keyof TraitVector; pos: string; neg: string }[] = [
@@ -34,193 +32,22 @@ interface TileDetailContentProps {
 }
 
 export function TileDetailContent({ tileKey }: TileDetailContentProps) {
-  const draftClickKey         = useUIStore((state) => state.draftClickKey);
-  const draftSources          = useUIStore((state) => state.draftSources);
-  const setDraftModeActive    = useUIStore((state) => state.setDraftModeActive);
-  const setInvadeModeActive   = useUIStore((state) => state.setInvadeModeActive);
-  const setDraftClickKey      = useUIStore((state) => state.setDraftClickKey);
-  const setDraftSources       = useUIStore((state) => state.setDraftSources);
-  const viewingPlayerId       = useUIStore((state) => state.viewingPlayerId);
-  const pendingActionFlash         = useUIStore((state) => state.pendingActionFlash);
-  const setPendingActionFlash      = useUIStore((state) => state.setPendingActionFlash);
-  const pendingRightClickAction    = useUIStore((state) => state.pendingRightClickAction);
-  const setPendingRightClickAction = useUIStore((state) => state.setPendingRightClickAction);
+  const viewingPlayerId    = useUIStore((state) => state.viewingPlayerId);
+  const pendingAction      = useUIStore((state) => state.pendingAction);
+  const clearPendingAction = useUIStore((state) => state.clearPendingAction);
 
-  const tiles             = useGameStore((state) => state.tiles);
-  const players           = useGameStore((state) => state.players);
-  const nations           = useGameStore((state) => state.nations);
-  const phase             = useGameStore((state) => state.phase);
-  const actionsRemaining  = useGameStore((state) => state.actionsRemaining);
-  const spentTroopsByTile = useGameStore((state) => state.spentTroopsByTile);
-  const relocatedTroops   = useGameStore((state) => state.relocatedTroops);
+  const tiles   = useGameStore((state) => state.tiles);
+  const players = useGameStore((state) => state.players);
+  const nations = useGameStore((state) => state.nations);
 
-  const receivedPassiveByTile = getReceivedPassiveByTile(relocatedTroops);
-  const humanPlayer = players.find((p) => p.id === viewingPlayerId);
-
-  const [draftMode,      setDraftMode]      = useState(false);
-  const [fortifyMode,    setFortifyMode]    = useState(false);
-  const [invadeMode,     setInvadeMode]     = useState(false);
   const [loyaltyLogOpen, setLoyaltyLogOpen] = useState(false);
-  const [buttonFlash,    setButtonFlash]    = useState(false);
-  const flashTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
-    setDraftMode(false);
-    setFortifyMode(false);
-    setInvadeMode(false);
     setLoyaltyLogOpen(false);
-    setDraftModeActive(false);
-    setInvadeModeActive(false);
-    setDraftSources({});
-    setDraftClickKey(null);
-    setPendingRightClickAction(null);
-    return () => {
-      if (flashTimerRef.current !== null) {
-        clearTimeout(flashTimerRef.current);
-        flashTimerRef.current = null;
-      }
-      setButtonFlash(false);
-    };
   }, [tileKey]);
-
-  useEffect(() => {
-    return () => {
-      setDraftModeActive(false);
-      setInvadeModeActive(false);
-      setDraftSources({});
-      setDraftClickKey(null);
-    };
-  }, []);
-
-  useEffect(() => {
-    if (!pendingRightClickAction) return;
-    if (pendingRightClickAction === 'annex') {
-      setDraftMode(true);
-      setDraftModeActive(true);
-    } else if (pendingRightClickAction === 'fortify') {
-      setFortifyMode(true);
-      setDraftModeActive(true);
-    } else if (pendingRightClickAction === 'invade') {
-      setInvadeMode(true);
-      setDraftModeActive(true);
-      setInvadeModeActive(true);
-    }
-    setPendingRightClickAction(null);
-  }, [tileKey, pendingRightClickAction]);
-
-  useEffect(() => {
-    if (!draftClickKey || !draftMode) return;
-    const clickedTile = tiles[draftClickKey];
-    if (!clickedTile || clickedTile.state !== 'owned') { setDraftClickKey(null); return; }
-    const owned = clickedTile as OwnedTile;
-    if (!humanPlayer || owned.ownerId !== humanPlayer.id) { setDraftClickKey(null); return; }
-    const alreadyAllocated = draftSources[draftClickKey] ?? 0;
-    const spent = spentTroopsByTile[draftClickKey] ?? 0;
-    const available = owned.activeTroops - spent - alreadyAllocated;
-    if (available <= 0) { setDraftClickKey(null); return; }
-    setDraftSources({ ...draftSources, [draftClickKey]: alreadyAllocated + 1 });
-    setDraftClickKey(null);
-  }, [draftClickKey]);
-
-  useEffect(() => {
-    if (!draftClickKey || !fortifyMode) return;
-    if (draftClickKey === tileKey) { setDraftClickKey(null); return; }
-    const clickedTile = tiles[draftClickKey];
-    if (!clickedTile || clickedTile.state !== 'owned') { setDraftClickKey(null); return; }
-    const owned = clickedTile as OwnedTile;
-    if (!humanPlayer || owned.ownerId !== humanPlayer.id) { setDraftClickKey(null); return; }
-    const alreadyAllocated = draftSources[draftClickKey] ?? 0;
-    const spent = spentTroopsByTile[draftClickKey] ?? 0;
-    const available = owned.activeTroops - spent - alreadyAllocated;
-    if (available <= 0) { setDraftClickKey(null); return; }
-    setDraftSources({ ...draftSources, [draftClickKey]: alreadyAllocated + 1 });
-    setDraftClickKey(null);
-  }, [draftClickKey]);
-
-  useEffect(() => {
-    if (!pendingActionFlash) return;
-    setButtonFlash(true);
-    flashTimerRef.current = setTimeout(() => {
-      setButtonFlash(false);
-      setPendingActionFlash(false);
-      flashTimerRef.current = null;
-    }, 600);
-    return () => {
-      if (flashTimerRef.current !== null) {
-        clearTimeout(flashTimerRef.current);
-        flashTimerRef.current = null;
-      }
-    };
-  }, [pendingActionFlash]);
-
-  useEffect(() => {
-    if (!draftClickKey || !invadeMode) return;
-    const tile = tiles[tileKey];
-    if (!tile) { setDraftClickKey(null); return; }
-    const adjacentKeys = new Set(hexNeighbors(tile.coord).map(coordKey));
-    if (!adjacentKeys.has(draftClickKey)) { setDraftClickKey(null); return; }
-    const clickedTile = tiles[draftClickKey];
-    if (!clickedTile || clickedTile.state !== 'owned') { setDraftClickKey(null); return; }
-    const owned = clickedTile as OwnedTile;
-    if (!humanPlayer || owned.ownerId !== humanPlayer.id) { setDraftClickKey(null); return; }
-    const alreadyAllocated = draftSources[draftClickKey] ?? 0;
-    const spent = spentTroopsByTile[draftClickKey] ?? 0;
-    const receivedPassive = receivedPassiveByTile[draftClickKey] ?? 0;
-    const available = owned.activeTroops - spent - receivedPassive - alreadyAllocated;
-    if (available <= 0) { setDraftClickKey(null); return; }
-    setDraftSources({ ...draftSources, [draftClickKey]: alreadyAllocated + 1 });
-    setDraftClickKey(null);
-  }, [draftClickKey]);
 
   const tile = tiles[tileKey];
   if (!tile || tile.state === 'water') return null;
-
-  const annexableTileKeys = phase === 'mobilization' ? getAnnexableTileKeys() : new Set<string>();
-  const isAnnexable = phase === 'mobilization' && tile.state === 'unclaimed' && annexableTileKeys.has(tileKey);
-  const annexAPCost   = DEFAULT_CONFIG.mobilization.annexAPCost;
-  const annexTroopMin = DEFAULT_CONFIG.mobilization.annexTroopMin;
-  const invadeAPCost  = DEFAULT_CONFIG.mobilization.invadeAPCost;
-  const invadeTroopMin = DEFAULT_CONFIG.mobilization.invadeTroopMin;
-  const draftedSoFar = Object.values(draftSources).reduce((a, b) => a + b, 0);
-
-  const totalAvailableTroops = humanPlayer
-    ? Object.values(tiles)
-        .filter((t): t is OwnedTile => t.state === 'owned' && (t as OwnedTile).ownerId === humanPlayer.id)
-        .reduce((sum, t) => sum + Math.max(0, t.activeTroops - (spentTroopsByTile[coordKey(t.coord)] ?? 0)), 0)
-    : 0;
-  const canAffordAnnex = actionsRemaining >= annexAPCost && totalAvailableTroops >= annexTroopMin;
-
-  const invadableTileKeys = phase === 'mobilization' ? getInvadableTileKeysForPlayer() : new Set<string>();
-  const isInvadable = phase === 'mobilization' && tile.state === 'barbarian' && invadableTileKeys.has(tileKey);
-  const adjacentAvailableTroops = phase === 'mobilization' && tile.state === 'barbarian'
-    ? hexNeighbors(tile.coord)
-        .map((c) => coordKey(c))
-        .filter((k) => { const t = tiles[k]; return t && t.state === 'owned' && (t as OwnedTile).ownerId === viewingPlayerId; })
-        .reduce((sum, k) => {
-          const t = tiles[k] as OwnedTile;
-          return sum + Math.max(0, t.activeTroops - (spentTroopsByTile[k] ?? 0) - (receivedPassiveByTile[k] ?? 0));
-        }, 0)
-    : 0;
-  const canInvade = actionsRemaining >= invadeAPCost && adjacentAvailableTroops >= invadeTroopMin;
-
-  const defenderTroops = tile.state === 'barbarian' ? (tile as BarbarianTile).activeTroops : 0;
-  const attackSuccessProb = draftedSoFar < invadeTroopMin
-    ? 0
-    : calcAttackSuccessProbability(draftedSoFar, defenderTroops, DEFAULT_CONFIG.combat.lanchesterExponent, DEFAULT_CONFIG.combat.defenderBonus);
-  const attackSuccessPercent = Math.round(attackSuccessProb * 100);
-  const probColor = attackSuccessPercent < 40 ? '#cc4444' : attackSuccessPercent < 70 ? '#cc9944' : '#44cc66';
-
-  const connectedAvailableTroops = phase === 'mobilization' && tile.state === 'owned'
-    ? Object.entries(tiles)
-        .filter(([k, t]) =>
-          k !== tileKey &&
-          t.state === 'owned' &&
-          (t as OwnedTile).ownerId === viewingPlayerId &&
-          (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0) > 0
-        )
-        .reduce((sum, [k, t]) => sum + Math.max(0, (t as OwnedTile).activeTroops - (spentTroopsByTile[k] ?? 0)), 0)
-    : 0;
-  const canFortify = actionsRemaining > 0 && connectedAvailableTroops > 0;
 
   const cv = tile.cultureVector;
   return (
@@ -240,7 +67,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       })()}
       {tile.state !== 'owned' && <div style={{ marginBottom: 4 }}>🏡 {tile.name}</div>}
       {tile.state === 'owned' && <div style={{ marginBottom: 6 }}>🏛️ {tile.name}</div>}
-      {tile.state === 'owned' && <div>🛡️ {tile.activeTroops}</div>}
+      {tile.state === 'owned' && <div>🛡️ {tile.troops}</div>}
 
       {divider}
 
@@ -288,127 +115,55 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
         </>
       )}
 
-      {isAnnexable && !draftMode && (
-        <>
-          {divider}
-          <button
-            disabled={!canAffordAnnex}
-            onClick={() => { if (canAffordAnnex) { setDraftMode(true); setDraftModeActive(true); } }}
-            style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-              background: canAffordAnnex ? '#1e2d3a' : '#0f1923',
-              color: buttonFlash ? '#cc4444' : (canAffordAnnex ? '#c0c8d0' : '#3a5060'),
-              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canAffordAnnex ? '#2a3f50' : '#1a2530'}`,
-              cursor: canAffordAnnex ? 'pointer' : 'not-allowed',
-            }}
-          >
-            {canAffordAnnex ? 'Annex' : actionsRemaining < annexAPCost ? 'Annex (insufficient AP)' : 'Annex (insufficient troops)'}
-          </button>
-        </>
-      )}
+      {pendingAction !== null && pendingAction.destinationKey === tileKey && (() => {
+        const totalCommitted = Object.values(pendingAction.sources).reduce((a, b) => a + b, 0);
+        const activeSourceCount = Object.values(pendingAction.sources).filter(c => c > 0).length;
 
-      {isAnnexable && draftMode && (
-        <>
-          {divider}
-          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
-            Troops committed: {draftedSoFar} (min {annexTroopMin})
-          </div>
-          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
-            Click highlighted tiles to contribute troops.
-          </div>
-          {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
-              {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
+        let winProbSection: React.ReactNode = null;
+        if (pendingAction.actionType === 'invade' && tile.state === 'barbarian') {
+          const defenderTroops = tile.troops;
+          const prob = totalCommitted < DEFAULT_CONFIG.mobilization.invadeTroopMin
+            ? 0
+            : calcAttackSuccessProbability(
+                totalCommitted,
+                defenderTroops,
+                DEFAULT_CONFIG.combat.lanchesterExponent,
+                DEFAULT_CONFIG.combat.defenderBonus,
+              );
+          const pct = Math.round(prob * 100);
+          const color = pct < 40 ? '#cc4444' : pct < 70 ? '#cc9944' : '#44cc66';
+          winProbSection = (
+            <div style={{ marginTop: 4 }}>
+              <strong style={{ color }}>⚔️ Success probability: {pct}%</strong>
             </div>
-          ))}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button
-              disabled={draftedSoFar < annexTroopMin}
-              onClick={() => {
-                if (draftedSoFar >= annexTroopMin) {
-                  performAnnex(tileKey, draftSources);
-                  setDraftMode(false);
-                  setDraftModeActive(false);
-                  setDraftSources({});
-                  setDraftClickKey(null);
-                }
-              }}
-              style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-                background: draftedSoFar >= annexTroopMin ? '#1e4a2a' : '#0f1923',
-                color: draftedSoFar >= annexTroopMin ? '#80cc90' : '#3a5060',
-                border: `1px solid ${draftedSoFar >= annexTroopMin ? '#2a6a3a' : '#1a2530'}`,
-                cursor: draftedSoFar >= annexTroopMin ? 'pointer' : 'not-allowed',
-              }}
-            >Confirm</button>
-            <button
-              onClick={() => { setDraftMode(false); setDraftModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
-            >Cancel</button>
-          </div>
-        </>
-      )}
+          );
+        }
 
-      {phase === 'mobilization' && tile.state === 'owned' && tile.ownerId === viewingPlayerId && !draftMode && !fortifyMode && (
-        <>
-          {divider}
-          <button
-            disabled={!canFortify}
-            onClick={() => { if (canFortify) { setFortifyMode(true); setDraftModeActive(true); } }}
-            style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-              background: canFortify ? '#1e2d3a' : '#0f1923',
-              color: buttonFlash ? '#cc4444' : (canFortify ? '#c0c8d0' : '#3a5060'),
-              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canFortify ? '#2a3f50' : '#1a2530'}`,
-              cursor: canFortify ? 'pointer' : 'not-allowed',
-            }}
-          >
-            {actionsRemaining === 0 ? 'Fortify (no AP)' : connectedAvailableTroops === 0 ? 'Fortify (no troops)' : 'Fortify'}
-          </button>
-        </>
-      )}
-
-      {phase === 'mobilization' && tile.state === 'owned' && tile.ownerId === viewingPlayerId && fortifyMode && (
-        <>
-          {divider}
-          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
-            Moving {draftedSoFar} troop{draftedSoFar !== 1 ? 's' : ''} here
-          </div>
-          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
-            Click highlighted tiles to move troops here.
-          </div>
-          {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
-              {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
+        return (
+          <>
+            {divider}
+            <div style={{ fontSize: 16, color: '#5a7a8a', fontVariant: 'small-caps', letterSpacing: '0.05em' }}>
+              {pendingAction.actionType.toUpperCase()}
             </div>
-          ))}
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
+            <div style={{ fontSize: 16, color: '#c0c8d0', marginTop: 2 }}>
+              {totalCommitted} troop{totalCommitted !== 1 ? 's' : ''} from {activeSourceCount} tile{activeSourceCount !== 1 ? 's' : ''}
+            </div>
+            {winProbSection}
             <button
-              disabled={draftedSoFar === 0}
-              onClick={() => {
-                if (draftedSoFar > 0) {
-                  performFortify(tileKey, draftSources);
-                  setFortifyMode(false);
-                  setDraftModeActive(false);
-                  setDraftSources({});
-                  setDraftClickKey(null);
-                }
-              }}
+              onClick={clearPendingAction}
               style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-                background: draftedSoFar > 0 ? '#1e4a2a' : '#0f1923',
-                color: draftedSoFar > 0 ? '#80cc90' : '#3a5060',
-                border: `1px solid ${draftedSoFar > 0 ? '#2a6a3a' : '#1a2530'}`,
-                cursor: draftedSoFar > 0 ? 'pointer' : 'not-allowed',
+                width: '100%', marginTop: 8, padding: '6px 0',
+                fontFamily: 'monospace', fontSize: 16,
+                background: '#1e2d3a', color: '#c0c8d0',
+                border: '1px solid #2a3f50', cursor: 'pointer',
               }}
-            >Confirm</button>
-            <button
-              onClick={() => { setFortifyMode(false); setDraftModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
-            >Cancel</button>
-          </div>
-        </>
-      )}
+            >
+              Cancel
+            </button>
+            {divider}
+          </>
+        );
+      })()}
 
       <div style={{ marginTop: 4, marginBottom: 2, color: '#5a7a8a' }}>Traits:</div>
       {TRAITS.map(({ key, pos, neg }) => {
@@ -431,72 +186,7 @@ export function TileDetailContent({ tileKey }: TileDetailContentProps) {
       {tile.state === 'barbarian' && (
         <>
           {divider}
-          <div>troops: {tile.activeTroops}</div>
-        </>
-      )}
-
-      {isInvadable && !invadeMode && !draftMode && !fortifyMode && (
-        <>
-          {divider}
-          <button
-            disabled={!canInvade}
-            onClick={() => { if (canInvade) { setInvadeMode(true); setDraftModeActive(true); setInvadeModeActive(true); } }}
-            style={{
-              width: '100%', padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-              background: canInvade ? '#1e2d3a' : '#0f1923',
-              color: buttonFlash ? '#cc4444' : (canInvade ? '#c0c8d0' : '#3a5060'),
-              border: buttonFlash ? '1px solid #cc4444' : `1px solid ${canInvade ? '#2a3f50' : '#1a2530'}`,
-              cursor: canInvade ? 'pointer' : 'not-allowed',
-            }}
-          >
-            {canInvade ? 'Invade' : actionsRemaining < invadeAPCost ? 'Invade (no AP)' : 'Invade (no adjacent troops)'}
-          </button>
-        </>
-      )}
-
-      {isInvadable && invadeMode && (
-        <>
-          {divider}
-          <div style={{ fontSize: 16, color: '#5a7a8a', marginBottom: 4 }}>
-            Drafting invasion force: {draftedSoFar} troops
-          </div>
-          <div style={{ fontSize: 16, color: '#7a9aaa', marginBottom: 8 }}>
-            Only adjacent tiles can contribute troops.
-          </div>
-          {Object.entries(draftSources).map(([key, count]) => (
-            <div key={key} style={{ fontSize: 16, color: '#c0c8d0' }}>
-              {(tiles[key] as OwnedTile | undefined)?.name ?? key}: {count} troop{count !== 1 ? 's' : ''}
-            </div>
-          ))}
-          <div style={{ marginTop: 6 }}>
-            <strong style={{ color: probColor }}>⚔️ Success probability: {attackSuccessPercent}%</strong>
-          </div>
-          <div style={{ display: 'flex', gap: 8, marginTop: 8 }}>
-            <button
-              disabled={draftedSoFar < invadeTroopMin}
-              onClick={() => {
-                if (draftedSoFar >= invadeTroopMin) {
-                  performInvade(tileKey, draftSources);
-                  setInvadeMode(false);
-                  setDraftModeActive(false);
-                  setInvadeModeActive(false);
-                  setDraftSources({});
-                  setDraftClickKey(null);
-                }
-              }}
-              style={{
-                flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16,
-                background: draftedSoFar >= invadeTroopMin ? '#1e4a2a' : '#0f1923',
-                color: draftedSoFar >= invadeTroopMin ? '#80cc90' : '#3a5060',
-                border: `1px solid ${draftedSoFar >= invadeTroopMin ? '#2a6a3a' : '#1a2530'}`,
-                cursor: draftedSoFar >= invadeTroopMin ? 'pointer' : 'not-allowed',
-              }}
-            >Confirm</button>
-            <button
-              onClick={() => { setInvadeMode(false); setDraftModeActive(false); setInvadeModeActive(false); setDraftSources({}); setDraftClickKey(null); }}
-              style={{ flex: 1, padding: '6px 0', fontFamily: 'monospace', fontSize: 16, background: '#1e2d3a', color: '#c0c8d0', border: '1px solid #2a3f50', cursor: 'pointer' }}
-            >Cancel</button>
-          </div>
+          <div>troops: {tile.troops}</div>
         </>
       )}
     </>

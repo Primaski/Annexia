@@ -75,19 +75,20 @@ interface UIState {
    */
   policyHoverChoice: 0 | 1 | null;
 
-  // ── Annex Draft ───────────────────────────────────────────────────────────
-  /** True while the player is selecting troop sources for a pending annex. */
-  draftModeActive: boolean;
-  /** True while the player is specifically in invade draft mode (restricts highlight to adjacent tiles). */
-  invadeModeActive: boolean;
-  /** The coordKey of the tile the player is drafting an annex toward. */
-  draftClickKey: string | null;
-  /** Troops allocated from each source tile during the current draft session. */
-  draftSources: Record<string, number>;
-  setDraftModeActive: (active: boolean) => void;
-  setInvadeModeActive: (active: boolean) => void;
-  setDraftClickKey: (key: string | null) => void;
-  setDraftSources: (sources: Record<string, number>) => void;
+  // ── Pending Action ────────────────────────────────────────────────────────
+  pendingAction: {
+    destinationKey: string;
+    actionType: 'fortify' | 'annex' | 'invade';
+    sources: Record<string, number>;
+  } | null;
+
+  setPendingAction: (action: { destinationKey: string; actionType: 'fortify' | 'annex' | 'invade'; sources: Record<string, number> } | null) => void;
+  /** Adds or merges a source into pendingAction.sources. No-op if pendingAction is null. */
+  addPendingSource: (sourceKey: string, count: number, max?: number) => void;
+  /** Increments/decrements a source's troop count. Floors at 0. No-op if pendingAction is null or sourceKey not in sources. */
+  adjustPendingSource: (sourceKey: string, delta: number, max?: number) => void;
+  /** Sets pendingAction to null. */
+  clearPendingAction: () => void;
 
   // ── Veto ──────────────────────────────────────────────────────────────────
   vetoResult: { policyId: string; tribuneId: string; originalChoiceIndex: number; finalChoiceIndex: number } | null;
@@ -98,14 +99,6 @@ interface UIState {
   toasts: ToastMessage[];
   pushToast: (toast: Omit<ToastMessage, 'id'>) => void;
   dismissToast: (id: string) => void;
-
-  // ── Action Button Flash ───────────────────────────────────────────────────
-  pendingActionFlash: boolean;
-  setPendingActionFlash: (v: boolean) => void;
-
-  // ── Pending Right-Click Action ────────────────────────────────────────────
-  pendingRightClickAction: 'annex' | 'invade' | 'fortify' | null;
-  setPendingRightClickAction: (action: 'annex' | 'invade' | 'fortify' | null) => void;
 
   // ── Simulation ────────────────────────────────────────────────────────────
   simulationMode: boolean;
@@ -149,14 +142,9 @@ export const useUIStore = create<UIState>((set) => ({
   activeOverlay: null,
   activePolicyCardIndex: 0,
   policyHoverChoice: null,
-  draftModeActive: false,
-  invadeModeActive: false,
-  draftClickKey: null,
-  draftSources: {},
+  pendingAction: null,
   vetoResult: null,
   toasts: [],
-  pendingActionFlash: false,
-  pendingRightClickAction: null,
 
   pushToast: (toast) =>
     set((state) => ({
@@ -187,18 +175,44 @@ export const useUIStore = create<UIState>((set) => ({
   setPolicyHoverChoice: (policyHoverChoice) => set({ policyHoverChoice }),
 
   closeAllPanels: () =>
-    set({ selectedTileCoord: null, policyHoverChoice: null }),
+    set({ selectedTileCoord: null, policyHoverChoice: null, pendingAction: null }),
 
-  setDraftModeActive: (draftModeActive) => set({ draftModeActive }),
-  setInvadeModeActive: (invadeModeActive) => set({ invadeModeActive }),
-  setDraftClickKey: (draftClickKey) => set({ draftClickKey }),
-  setDraftSources: (draftSources) => set({ draftSources }),
+  setPendingAction: (action) => { console.log('setPendingAction called', JSON.stringify(action)); set({ pendingAction: action }); },
+
+  addPendingSource: (sourceKey, count, max) =>
+    set((state) => {
+      console.log('addPendingSource called', sourceKey, count);
+      if (state.pendingAction === null) return state;
+      const current = state.pendingAction.sources[sourceKey] ?? 0;
+      const next = current + count;
+      const capped = max !== undefined ? Math.min(next, max) : next;
+      return {
+        pendingAction: {
+          ...state.pendingAction,
+          sources: { ...state.pendingAction.sources, [sourceKey]: Math.max(0, capped) },
+        },
+      };
+    }),
+
+  adjustPendingSource: (sourceKey, delta, max) =>
+    set((state) => {
+      if (state.pendingAction === null || !(sourceKey in state.pendingAction.sources)) return state;
+      const next = state.pendingAction.sources[sourceKey] + delta;
+      const capped = max !== undefined ? Math.min(next, max) : next;
+      return {
+        pendingAction: {
+          ...state.pendingAction,
+          sources: {
+            ...state.pendingAction.sources,
+            [sourceKey]: Math.max(0, capped),
+          },
+        },
+      };
+    }),
+
+  clearPendingAction: () => set({ pendingAction: null }),
 
   setVetoResult: (vetoResult) => set({ vetoResult }),
 
   clearVetoResult: () => set({ vetoResult: null }),
-
-  setPendingActionFlash: (pendingActionFlash) => set({ pendingActionFlash }),
-
-  setPendingRightClickAction: (pendingRightClickAction) => set({ pendingRightClickAction }),
 }));

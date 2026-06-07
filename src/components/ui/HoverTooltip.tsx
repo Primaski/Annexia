@@ -77,7 +77,7 @@ export function HoverTooltip() {
           <div style={{ fontSize: 20, color: '#e0e8f0' }}>{nationName} 🗿</div>
         </div>
         <div style={{ marginBottom: 6 }}>🏡 {tile.name}</div>
-        <div>⚔️ {tile.activeTroops}</div>
+        <div>⚔️ {tile.troops}</div>
         {dominantEmojis.length > 0 && <div>{dominantEmojis.join('')}</div>}
       </div>
     );
@@ -95,7 +95,7 @@ export function HoverTooltip() {
       </div>
       <div style={{ marginBottom: 6 }}>🏛️ {tile.name}</div>
       {/* TODO: [REDACT in multiplayer] hide troop count for enemy tiles */}
-      <div>⚔️ {tile.activeTroops}</div>
+      <div>⚔️ {tile.troops}</div>
       {/* TODO: [REDACT in multiplayer] hide loyalty for enemy tiles unless an intel effect is active */}
       <div>😊 {Math.round(tile.loyalty * 100)}</div>
       {/* TODO: [REDACT in multiplayer] hide culture vector summary for enemy tiles unless an intel effect is active */}

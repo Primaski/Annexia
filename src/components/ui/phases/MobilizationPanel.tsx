@@ -1,16 +1,28 @@
+import { useEffect } from 'react';
 import { useGameStore } from '../../../store/gameStore';
 import { useUIStore } from '../../../store/uiStore';
-import { endMobilizationPhase, getAnnexableTileKeys } from '../../../hooks/useGame';
+import { endMobilizationPhase } from '../../../hooks/useGame';
 import { coordKey } from '../../../engine/hex';
 import { TileDetailContent } from '../TileDetailContent';
 
 export function MobilizationPanel() {
-  const actionsRemaining = useGameStore((state) => state.actionsRemaining);
-  const currentTurn      = useGameStore((state) => state.currentTurn);
-  const tiles            = useGameStore((state) => state.tiles);
-  const selectedCoord    = useUIStore((state) => state.selectedTileCoord);
+  const actionsRemaining   = useGameStore((state) => state.actionsRemaining);
+  const currentTurn        = useGameStore((state) => state.currentTurn);
+  const tiles              = useGameStore((state) => state.tiles);
+  const selectedCoord      = useUIStore((state) => state.selectedTileCoord);
+  const clearPendingAction = useUIStore((state) => state.clearPendingAction);
+  const pendingAction      = useUIStore((state) => state.pendingAction);
 
-  const tileKey        = selectedCoord ? coordKey(selectedCoord) : null;
+  useEffect(() => {
+    const handler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') clearPendingAction();
+    };
+    window.addEventListener('keydown', handler);
+    return () => window.removeEventListener('keydown', handler);
+  }, [clearPendingAction]);
+
+  const pendingDestKey = pendingAction?.destinationKey ?? null;
+  const tileKey        = pendingDestKey ?? (selectedCoord ? coordKey(selectedCoord) : null);
   const tile           = tileKey ? tiles[tileKey] : null;
   const showTileDetail = !!(tile && tile.state !== 'water');
 
@@ -29,20 +41,9 @@ export function MobilizationPanel() {
         {showTileDetail ? (
           <TileDetailContent tileKey={tileKey!} />
         ) : (
-          (() => {
-            if (actionsRemaining === 0) return null;
-            const count = getAnnexableTileKeys().size;
-            if (count > 0) return (
-              <div style={{ fontSize: 20, color: '#7a9aaa' }}>
-                Click an adjacent unclaimed tile to annex.
-              </div>
-            );
-            return (
-              <div style={{ fontSize: 20, color: '#5a7a8a' }}>
-                No unclaimed tiles adjacent to your territory.
-              </div>
-            );
-          })()
+          <div style={{ fontSize: 20, color: '#7a9aaa' }}>
+            Right-click and drag to move troops.
+          </div>
         )}
       </div>
 

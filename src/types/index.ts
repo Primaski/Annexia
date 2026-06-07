@@ -186,7 +186,7 @@ export type UnclaimedTile = LandTile & { state: 'unclaimed' };
  */
 export type BarbarianTile = LandTile & {
   state: 'barbarian';
-  activeTroops: number;       // Assigned at generation. Scales with cluster militarism.
+  troops: number;       // Assigned at generation. Scales with cluster militarism.
   previousOwner: string | null; // Player ID of last owner before becoming barbarian; null if always barbarian.
 };
 
@@ -209,7 +209,7 @@ export type OwnedTile = LandTile & {
   ownerId: string;       // References Player.id
   loyalty: number;       // Float in [-1, 1].
   loyaltyTarget: number; // Float in [-1, 1].
-  activeTroops: number;  // Per-tile troop count. [0, MAX]. Starts at 10 on spawn tile, 0 on all other owned tiles.
+  troops: number;  // Per-tile troop count. [0, MAX]. Starts at 10 on spawn tile, 0 on all other owned tiles.
   suppression: number;   // 0–100. Slows loyalty decay; builds hidden resentment.
   defense: number;       // 0–100. Starts at 0 (from unclaimed) or inherited (from barbarian).
   loyaltyLog: LoyaltyLogEntry[];

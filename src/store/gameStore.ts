@@ -93,8 +93,6 @@ interface GameState {
   actionsRemaining: number;
   /** Log of troop movements made this mobilization phase. Cleared on advanceTurn. */
   relocatedTroops: { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }[];
-  /** Running tally of troops committed from each tile this phase. Used by getTotalAvailableTroops. */
-  spentTroopsByTile: Record<string, number>;
   recordTroopRelocation: (entry: { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }) => void;
   clearRelocations: () => void;
 
@@ -201,7 +199,6 @@ const initialState = {
   roundtableReason: null,
   actionsRemaining: 0,
   relocatedTroops: [] as { fromKey: string; toKey: string; count: number; ownerId: string; actionType: 'passive' | 'military' }[],
-  spentTroopsByTile: {} as Record<string, number>,
   config: DEFAULT_CONFIG,
   winnerId: null,
   mapSeed: null,
@@ -251,13 +248,9 @@ export const useGameStore = create<GameState>((set) => ({
   recordTroopRelocation: (entry) =>
     set((state) => ({
       relocatedTroops: [...state.relocatedTroops, entry],
-      spentTroopsByTile: {
-        ...state.spentTroopsByTile,
-        [entry.fromKey]: (state.spentTroopsByTile[entry.fromKey] ?? 0) + entry.count,
-      },
     })),
 
-  clearRelocations: () => set({ relocatedTroops: [], spentTroopsByTile: {} }),
+  clearRelocations: () => set({ relocatedTroops: [] }),
 
   advanceTurn: () =>
     set((state) => ({
@@ -267,7 +260,6 @@ export const useGameStore = create<GameState>((set) => ({
       submittedPlayerIds: [],
       actionsRemaining: 0,
       relocatedTroops: [],
-      spentTroopsByTile: {},
     })),
 
   setPendingRoundtable: (reason) =>

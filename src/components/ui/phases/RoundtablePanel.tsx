@@ -25,7 +25,7 @@ export function RoundtablePanel() {
     (t): t is OwnedTile =>
       t.state === 'owned' &&
       (t as OwnedTile).ownerId === viewingPlayerId &&
-      (t as OwnedTile).activeTroops === DEFAULT_CONFIG.mobilization.spawnTroops,
+      (t as OwnedTile).troops === DEFAULT_CONFIG.mobilization.spawnTroops,
   );
   const spawnTileName = spawnTile?.name ?? '';
 

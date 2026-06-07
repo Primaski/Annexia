@@ -105,26 +105,23 @@ export function TileDetailPanel() {
           userSelect: 'none',
         }}
       >
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-          {tile.state === 'barbarian' && (
-            <Sprite size={72} zoom={1.2} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={headerNationName ?? 'Unknown'} />
-          )}
-          {tile.state === 'owned' && (
-            <Sprite size={72} zoom={1.2} imagePath={headerPlayer?.imagePath ?? null} name={headerPlayer?.name ?? '?'} />
-          )}
-          <div>
-            <div style={{ fontSize: 20, color: '#e0e8f0' }}>
-              {tile.state === 'unclaimed'
-                ? tile.name
-                : tile.state === 'barbarian'
-                  ? `${headerNationName ?? 'Unknown'} (barbarian)`
-                  : (headerNationName ?? 'Unknown')}
-            </div>
-            <div style={{ fontSize: 14, color: '#3a5a6a', marginTop: 2 }}>
-              [{tile.coord.q}, {tile.coord.r}]
+        {tile.state !== 'owned' && (
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            {tile.state === 'barbarian' && (
+              <Sprite size={72} zoom={1.2} imagePath={'https://thumbs.dreamstime.com/b/barbarian-warrior-fantasy-cartoon-character-video-game-sprite-pixel-art-style-squares-wide-high-barbarian-warrior-419019049.jpg'} name={headerNationName ?? 'Unknown'} />
+            )}
+            <div>
+              <div style={{ fontSize: 20, color: '#e0e8f0' }}>
+                {tile.state === 'unclaimed'
+                  ? tile.name
+                  : `${headerNationName ?? 'Unknown'} (barbarian)`}
+              </div>
+              <div style={{ fontSize: 14, color: '#3a5a6a', marginTop: 2 }}>
+                [{tile.coord.q}, {tile.coord.r}]
+              </div>
             </div>
           </div>
-        </div>
+        )}
         <button
           onMouseDown={(e) => e.stopPropagation()}
           onClick={() => selectTile(null)}
@@ -137,6 +134,7 @@ export function TileDetailPanel() {
             fontSize: 14,
             padding: 0,
             lineHeight: 1,
+            marginLeft: 'auto',
           }}
         >
           ×

@@ -104,10 +104,12 @@ interface HexTileProps {
   activePolicy?: Policy;
   humanPlayerId?: string;
   tiles?: Record<string, Tile>;
+  draftCount?: number;
+  lockedArrivals?: number;
   onClick?: () => void;
 }
 
-export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, activePolicy, humanPlayerId, tiles, onClick }: HexTileProps) {
+export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnnexTarget, activePolicy, humanPlayerId, tiles, draftCount, lockedArrivals, onClick }: HexTileProps) {
   const activeOverlay      = useUIStore((state) => state.activeOverlay);
   const policyHoverChoice  = useUIStore((state) => state.policyHoverChoice);
 
@@ -141,11 +143,11 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
   }
 
   if (isDraftSource) { fill = '#5a9ecc'; }
-  if (tile.state === 'owned' && tile.activeTroops > 0) { fill = darkenColor(fill, 0.85); }
+  if (tile.state === 'owned' && tile.troops > 0) { fill = darkenColor(fill, 0.85); }
   if (activeOverlay === null && tile.state === 'barbarian') {
     const base = blendedTerrainTint(tile, tiles);
     fill = lerpColor(base, '#e7b197', 0.80);
-    if (tile.activeTroops >= 1) fill = lerpColor(fill, '#000000', 0.15);
+    if (tile.troops >= 1) fill = lerpColor(fill, '#000000', 0.15);
   }
 
   let loyaltyOverlayColor: string | null = null;
@@ -211,6 +213,60 @@ export function HexTile({ tile, center, size, playerIndex, isDraftSource, isAnne
           style={{ animation: 'loyaltyPulse 1.0s ease-in-out infinite', pointerEvents: 'none' }}
         />
       )}
+      {draftCount !== undefined && draftCount !== 0 && (
+        <text
+          x={center.x.toFixed(2)}
+          y={center.y.toFixed(2)}
+          textAnchor="middle"
+          dominantBaseline="middle"
+          fill={draftCount > 0 ? '#80cc90' : '#cc8844'}
+          fontSize={size * 0.7}
+          fontFamily="monospace"
+          fontWeight="bold"
+          style={{ pointerEvents: 'none', userSelect: 'none' }}
+        >
+          {draftCount > 0 ? `+${draftCount}` : `${draftCount}`}
+        </text>
+      )}
+      {draftCount === undefined && tile.state !== 'water' && (() => {
+        const troopCount = (tile.state === 'owned' || tile.state === 'barbarian') ? tile.troops : 0;
+        if (troopCount <= 0) return null;
+        const locked = lockedArrivals ?? 0;
+        const free = troopCount - locked;
+        if (locked > 0) {
+          return (
+            <text
+              x={center.x.toFixed(2)}
+              y={center.y.toFixed(2)}
+              textAnchor="middle"
+              dominantBaseline="middle"
+              fontFamily="monospace"
+              fontWeight="bold"
+              fontSize={size * 0.55}
+              style={{ pointerEvents: 'none', userSelect: 'none' }}
+            >
+              <tspan fill="#e0e8f0">{free}</tspan>
+              <tspan fill="#8ab0c0">|</tspan>
+              <tspan fill="#8ab0c0">{troopCount}</tspan>
+            </text>
+          );
+        }
+        return (
+          <text
+            x={center.x.toFixed(2)}
+            y={center.y.toFixed(2)}
+            textAnchor="middle"
+            dominantBaseline="middle"
+            fill="#e0e8f0"
+            fontSize={size * 0.7}
+            fontFamily="monospace"
+            fontWeight="bold"
+            style={{ pointerEvents: 'none', userSelect: 'none' }}
+          >
+            {troopCount}
+          </text>
+        );
+      })()}
     </>
   );
 }

@@ -61,7 +61,7 @@ export function annexTile(
 
   for (const [sourceKey, count] of Object.entries(troopSources)) {
     const sourceTile = newTiles[sourceKey] as OwnedTile;
-    newTiles[sourceKey] = { ...sourceTile, activeTroops: sourceTile.activeTroops - count };
+    newTiles[sourceKey] = { ...sourceTile, troops: sourceTile.troops - count };
   }
 
   newTiles[targetKey] = {
@@ -73,7 +73,7 @@ export function annexTile(
     loyaltyTarget: SPAWN_LOYALTY,
     suppression: 0,
     defense: 0,
-    activeTroops: troopSum,
+    troops: troopSum,
     loyaltyLog: [],
   } as OwnedTile;
 
@@ -111,7 +111,7 @@ export function fortifyTile(
     if (sourceTile.ownerId !== playerId) {
       throw new Error('fortifyTile: source tile does not belong to playerId');
     }
-    if (sourceTile.activeTroops < count) {
+    if (sourceTile.troops < count) {
       throw new Error(`fortifyTile: source tile ${sourceKey} has insufficient troops`);
     }
   }
@@ -120,11 +120,11 @@ export function fortifyTile(
 
   for (const [sourceKey, count] of Object.entries(troopSources)) {
     const sourceTile = newTiles[sourceKey] as OwnedTile;
-    newTiles[sourceKey] = { ...sourceTile, activeTroops: sourceTile.activeTroops - count };
+    newTiles[sourceKey] = { ...sourceTile, troops: sourceTile.troops - count };
   }
 
   const ownedTarget = target as OwnedTile;
-  newTiles[targetKey] = { ...ownedTarget, activeTroops: ownedTarget.activeTroops + totalMoved };
+  newTiles[targetKey] = { ...ownedTarget, troops: ownedTarget.troops + totalMoved };
 
   return newTiles;
 }
@@ -221,10 +221,10 @@ export function invadeTile(
 
   for (const [sourceKey, count] of Object.entries(troopSources)) {
     const sourceTile = newTiles[sourceKey] as OwnedTile;
-    newTiles[sourceKey] = { ...sourceTile, activeTroops: sourceTile.activeTroops - count };
+    newTiles[sourceKey] = { ...sourceTile, troops: sourceTile.troops - count };
   }
 
-  const defenderTroops = (tiles[targetKey] as BarbarianTile).activeTroops;
+  const defenderTroops = (tiles[targetKey] as BarbarianTile).troops;
   const result = simulateCombat(troopSum, defenderTroops, lanchesterExponent, defenderBonus, rand);
 
   if (result.attackerWon) {
@@ -237,13 +237,13 @@ export function invadeTile(
       loyaltyTarget: CONQUEST_LOYALTY_BARBARIAN,
       suppression: 0,
       defense: 0,
-      activeTroops: result.attackerSurvivors,
+      troops: result.attackerSurvivors,
       loyaltyLog: [],
     } as OwnedTile;
   } else {
     newTiles[targetKey] = {
       ...(tiles[targetKey] as BarbarianTile),
-      activeTroops: result.defenderSurvivors,
+      troops: result.defenderSurvivors,
       previousOwner: null,
     };
   }
@@ -258,12 +258,12 @@ export function invadeTile(
 export function getTotalAvailableTroops(
   tiles: Record<string, Tile>,
   playerId: string,
-  spentTroopsByTile: Record<string, number>
+  lockedArrivalsByTile: Record<string, number>
 ): number {
   let total = 0;
   for (const [key, tile] of Object.entries(tiles)) {
     if (tile.state !== 'owned' || tile.ownerId !== playerId) continue;
-    total += Math.max(0, tile.activeTroops - (spentTroopsByTile[key] ?? 0));
+    total += Math.max(0, tile.troops - (lockedArrivalsByTile[key] ?? 0));
   }
   return total;
 }

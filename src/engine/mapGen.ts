@@ -560,7 +560,7 @@ export function generateMap(
   // Step 3c: Stamp barbarian state (troops assigned after nation IDs are known)
   const stampedTiles = tiles.map((tile): Tile => {
     if (tile.state !== 'unclaimed' || !barbarianKeys.has(coordKey(tile.coord))) return tile;
-    return { ...tile, state: 'barbarian' as const, activeTroops: 0, previousOwner: null };
+    return { ...tile, state: 'barbarian' as const, troops: 0, previousOwner: null };
   });
 
   // Step 3d: Flood-fill barbarian tiles to assign contiguous nation IDs
@@ -600,7 +600,7 @@ export function generateMap(
     }
   }
 
-  // Step 3e: Assign activeTroops per barbarian nation cluster.
+  // Step 3e: Assign troops per barbarian nation cluster.
   // troopsPerTile maps militarism [-1, 1] → [10, 20].
   // Each tile gets floorPerTile guaranteed; the remainder is distributed randomly.
   const barbarianByNation = new Map<string, string[]>();
@@ -632,7 +632,7 @@ export function generateMap(
     for (let i = 0; i < clusterSize; i++) {
       const t = tileByKey.get(clusterKeys[i])!;
       if (t.state === 'barbarian') {
-        tileByKey.set(clusterKeys[i], { ...t, activeTroops: troopCounts[i] });
+        tileByKey.set(clusterKeys[i], { ...t, troops: troopCounts[i] });
       }
     }
   }
